@@ -1,9 +1,9 @@
 # MedicalCare - Client Side Treatment Management System
 
 MedicalCare is a React based frontend application designed to help clinicians manage treatment sessions, transcriptions, care plans, reports and patient records.  
-This project focuses entirely on the client side, with no backend required, making it ideal as an open source friendly and portfolio ready project.
+This project focuses entirely on the client side (no backend), making it ideal as a portfolio project and suitable for open source integration in the future.
 
-The system is suitable for therapy, rehabilitation, voice care, sports medicine and general clinical environments.
+The system supports therapy, rehabilitation, sports medicine, voice care and general clinical documentation workflows.
 
 ---
 
@@ -13,8 +13,8 @@ The system is suitable for therapy, rehabilitation, voice care, sports medicine 
 - Enable real time or near real time transcription for clinical notes.
 - Allow therapists to create structured care plans for each patient.
 - Generate clear and professional treatment summary reports (PDF).
-- Offer a personal treatment calendar for scheduling and reminders.
-- Maintain a full digital patient record stored locally on the client.
+- Provide a built in treatment calendar for scheduling and reminders.
+- Maintain a full digital patient record, stored locally on the client.
 
 ---
 
@@ -23,49 +23,57 @@ The system is suitable for therapy, rehabilitation, voice care, sports medicine 
 ### 1. Treatment Transcription
 
 - Record audio from the device microphone.
-- Perform basic transcription (using an API or a simulated placeholder for now).
-- Display the transcription text on screen.
-- Save the session notes to the patient record.
+- Perform simple transcription (placeholder or external API).
+- Display transcription live on the screen.
+- Save session notes to the patient record.
+
+---
 
 ### 2. Care Plan Builder
 
 - Add therapy goals.
-- Add tasks, exercises or treatment steps.
-- Plan treatment frequency and schedule.
-- Save the care plan locally per patient.
+- Add exercises, tasks or treatment steps.
+- Select treatment frequency and schedule.
+- Save the care plan for each patient.
+
+---
 
 ### 3. Treatment Summary Report (PDF)
 
-- Combine transcription and care plan into a single report.
-- Generate and download a PDF document.
-- Include date, patient details and summary notes.
-- Store previous reports inside the patient record.
+- Combine transcription + care plan into a single PDF.
+- Include patient details, notes and structured sections.
+- Generate and download the report.
+- Save previous reports inside the patient’s digital record.
+
+---
 
 ### 4. Treatment Calendar
 
-- Add upcoming treatment sessions.
-- Select dates and times through a calendar component.
-- Store session schedule in localStorage.
-- Display all future and past events in a clean interface.
+- Add future treatment sessions.
+- Choose dates and times using a calendar component.
+- Store the schedule in localStorage.
+- Display upcoming and past appointments in a clean interface.
+
+---
 
 ### 5. Digital Patient Record
 
 - Create and manage patient profiles.
-- Store transcriptions, care plans and reports per patient.
-- View and update existing records.
-- No backend required (localStorage only).
+- View past sessions, care plans and reports.
+- Store all data locally (localStorage only).
+- Update or delete patient information when needed.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - React (Hooks)
-- JavaScript
+- JavaScript (ES6+)
 - CSS
 - Web Audio API
 - LocalStorage
-- jsPDF for PDF generation
-- React Calendar or a similar calendar component
+- jsPDF (for PDF generation)
+- React Calendar or similar calendar library
 
 ---
 
@@ -89,4 +97,4 @@ src/
   data/
     mockPatients.json
   App.jsx
-  index.js
+  main.jsx
