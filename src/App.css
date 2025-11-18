@@ -1,42 +1,145 @@
-#root {
-  max-width: 1280px;
+/* src/App.css */
+
+/* Main app layout */
+.app-container {
+  max-width: 960px;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 2rem 1.5rem;
+  font-family: Arial, sans-serif;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Titles */
+.app-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #222;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.section-title {
+  font-size: 20px;
+  margin: 1.5rem 0 0.75rem;
+  color: #333;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Card-style section wrapper */
+.app-section {
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  padding: 1.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
-.card {
-  padding: 2em;
+/* Patient form layout */
+.patient-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.2rem 1.5rem;
 }
 
-.read-the-docs {
-  color: #888;
+/* Each field wrapper */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+/* Force full width for large fields like notes */
+.form-full-width {
+  grid-column: 1 / -1;
+}
+
+/* Labels */
+.form-field label {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 0.3rem;
+  color: #333;
+}
+
+/* Inputs, selects, textareas */
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 0.6rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #b5b5b5;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  background-color: #fdfdfd;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: #0077cc;
+  box-shadow: 0 0 0 2px rgba(0, 119, 204, 0.2);
+}
+
+/* Error text */
+.form-error {
+  grid-column: 1 / -1;
+  color: #c0392b;
+  font-size: 14px;
+  margin-bottom: 0.5rem;
+}
+
+/* Submit button area */
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.form-actions button {
+  padding: 0.7rem 1.4rem;
+  background-color: #0077cc;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background-color 150ms ease, transform 80ms ease;
+}
+
+.form-actions button:hover {
+  background-color: #005fa3;
+  transform: translateY(-1px);
+}
+
+.form-actions button:active {
+  transform: translateY(0);
+}
+
+/* Patients list */
+.patients-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.patients-item {
+  background-color: #ffffff;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin-top: 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.patients-item-main {
+  font-weight: 600;
+  color: #222;
+}
+
+.patients-item-sub {
+  font-size: 13px;
+  color: #666;
 }

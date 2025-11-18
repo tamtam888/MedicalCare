@@ -1,35 +1,54 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.jsx
 
+import { useState } from "react";
+import PatientForm from "./components/PatientForm";
+import "./App.css";
+
+// Main application component - manages global patient state
 function App() {
-  const [count, setCount] = useState(0)
+  const [patients, setPatients] = useState([]);
+
+  // Add a new patient to the list
+  const handleCreatePatient = (newPatientData) => {
+    const patientWithId = {
+      id: crypto.randomUUID(),
+      ...newPatientData,
+    };
+
+    console.log("New patient created:", patientWithId);
+
+    setPatients((prev) => [...prev, patientWithId]);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="app-container">
+      <h1 className="app-title">Digital Patient Record - Create patient profile</h1>
+
+      <section className="app-section">
+        <PatientForm onCreatePatient={handleCreatePatient} />
+      </section>
+
+      <section className="app-section">
+        <h2 className="section-title">Patients list</h2>
+        {patients.length === 0 ? (
+          <p>No patients yet.</p>
+        ) : (
+          <ul className="patients-list">
+            {patients.map((p) => (
+              <li key={p.id} className="patients-item">
+                <span className="patients-item-main">
+                  {p.firstName} {p.lastName}
+                </span>
+                <span className="patients-item-sub">
+                  {p.dateOfBirth} {p.gender && `- ${p.gender}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
 }
 
-export default App
+export default App;
