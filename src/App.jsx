@@ -22,6 +22,14 @@ function App() {
 
   return (
     <div className="app-container">
+
+      {/* כאן שמנו את התמונה השנייה */}
+      <img 
+        src="/icon.png" 
+        alt="MedicalCare Icon" 
+        className="app-logo"
+      />
+
       <h1 className="app-title">Digital Patient Record - Create patient profile</h1>
 
       <section className="app-section">
@@ -52,3 +60,4 @@ function App() {
 }
 
 export default App;
+
