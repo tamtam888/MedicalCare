@@ -1,5 +1,6 @@
 // src/components/PatientForm.jsx
 import { useState, useEffect } from "react";
+import "./PatientForm.css";
 
 const initialFormState = {
   firstName: "",
@@ -24,6 +25,9 @@ function PatientForm({
 
   const isEditing = Boolean(editingPatient);
 
+  // תאריך היום בפורמט YYYY-MM-DD כדי להשתמש ב max בשדה התאריך
+  const today = new Date().toISOString().split("T")[0];
+
   // כשעוברים ממצב יצירה למצב עריכה ולהפך
   useEffect(() => {
     if (editingPatient) {
@@ -38,6 +42,12 @@ function PatientForm({
   const handleChange = (event) => {
     const { name, value } = event.target;
 
+    // מניעת תאריך לידה עתידי
+    if (name === "dateOfBirth" && value && value > today) {
+      setError("Date of birth cannot be in the future.");
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -47,9 +57,20 @@ function PatientForm({
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    // שדות חובה
-    if (!formData.firstName || !formData.lastName || !formData.idNumber) {
+    // שדות חובה: firstName, lastName, idNumber, phone
+    if (
+      !formData.firstName ||
+      !formData.lastName ||
+      !formData.idNumber ||
+      !formData.phone
+    ) {
       setError("Please fill in all required fields marked with *.");
+      return;
+    }
+
+    // בדיקה נוספת: תאריך לידה לא עתידי
+    if (formData.dateOfBirth && formData.dateOfBirth > today) {
+      setError("Date of birth cannot be in the future.");
       return;
     }
 
@@ -117,6 +138,7 @@ function PatientForm({
           type="date"
           value={formData.dateOfBirth}
           onChange={handleChange}
+          max={today} 
         />
       </div>
 
@@ -136,7 +158,9 @@ function PatientForm({
       </div>
 
       <div className="form-field">
-        <label htmlFor="phone">Phone number</label>
+        <label htmlFor="phone">
+          Phone number <span className="required-asterisk">*</span>
+        </label>
         <input
           id="phone"
           name="phone"
@@ -189,7 +213,7 @@ function PatientForm({
             Cancel
           </button>
         )}
-        <button type="submit">
+        <button type="submit" className="form-submit-btn">
           {isEditing ? "Update patient" : "Create patient"}
         </button>
       </div>
@@ -198,4 +222,3 @@ function PatientForm({
 }
 
 export default PatientForm;
-

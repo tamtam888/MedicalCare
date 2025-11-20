@@ -1,0 +1,36 @@
+.patient-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.patient-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  background-color: #fafafa;
+}
+
+.patient-list-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.patient-list-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.patient-list-id {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.patient-list-actions {
+  display: flex;
+  gap: 0.4rem;
+}
