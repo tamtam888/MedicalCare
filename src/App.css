@@ -1,6 +1,4 @@
-/* src/App.css */
-
-/* Logo */
+/* לוגו */
 .app-logo {
   width: 150px;
   display: block;
@@ -8,220 +6,66 @@
   filter: drop-shadow(0 0 12px rgba(0,0,0,0.30));
 }
 
-/* Main app layout */
+/* מבנה כללי */
 .app-container {
   max-width: 960px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
   font-family: Arial, sans-serif;
+  background-color: #fff;
+  border-radius: 12px;
 }
 
-/* Titles */
+/* כותרות */
 .app-title {
   font-size: 28px;
   font-weight: 700;
   margin-bottom: 1.5rem;
   color: #222;
+  text-align: center;
 }
 
 .section-title {
   font-size: 20px;
   margin: 1.5rem 0 0.75rem;
   color: #333;
-}
-
-/* Card-style section wrapper */
-.app-section {
-  background-color: #ffffff;
-  border-radius: 10px;
-  border: 1px solid #e0e0e0;
-  padding: 1.5rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-/* Patient form layout */
-.patient-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.2rem 1.5rem;
-}
-
-/* Each field wrapper */
-.form-field {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-
-/* Force full width for large fields like notes */
-.form-full-width {
-  grid-column: 1 / -1;
-}
-
-/* Labels */
-.form-field label {
   font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 0.3rem;
-  color: #333;
 }
 
-/* Inputs, selects, textareas */
-.form-field input,
-.form-field select,
-.form-field textarea {
-  padding: 0.6rem 0.7rem;
-  border-radius: 6px;
-  border: 1px solid #b5b5b5;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-  background-color: #fdfdfd;
-}
-
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
-  border-color: #0077cc;
-  box-shadow: 0 0 0 2px rgba(0, 119, 204, 0.2);
-}
-
-/* Error text */
-.form-error {
-  grid-column: 1 / -1;
-  color: #c0392b;
-  font-size: 14px;
-  margin-bottom: 0.5rem;
-}
-
-/* Submit button area */
-.form-actions {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.form-actions button {
-  padding: 0.7rem 1.4rem;
-  background-color: #0077cc;
-  color: white;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 999px;
+/* כפתורים גלובליים */
+.primary-button,
+.secondary-button,
+.danger-button {
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
   border: none;
   cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: background-color 150ms ease, transform 80ms ease;
+  font-size: 0.9rem;
 }
 
-.form-actions button:hover {
-  background-color: #005fa3;
-  transform: translateY(-1px);
+.primary-button {
+  background-color: #2563eb;
+  color: #fff;
 }
 
-.form-actions button:active {
-  transform: translateY(0);
+.secondary-button {
+  background-color: #e5e7eb;
+  color: #111827;
 }
 
-/* Cancel button in form */
-.form-cancel-btn {
-  background-color: #999999;
+.danger-button {
+  background-color: #dc2626;
+  color: #fff;
 }
 
-.form-cancel-btn:hover {
-  background-color: #7a7a7a;
+/* הודעות כלליות */
+.empty-state {
+  font-size: 0.9rem;
+  color: #6b7280;
 }
 
-/* Patients list */
-.patients-list {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.patients-item {
-  background-color: #ffffff;
-  border: 1px solid #e1e1e1;
-  border-radius: 8px;
-  padding: 0.8rem 1rem;
-  margin-top: 0.6rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.patients-item-content {
-  flex: 1;
-}
-
-.patients-item-main {
-  font-weight: 600;
-  color: #222;
-}
-
-.patients-item-sub {
-  font-size: 13px;
-  color: #666;
-}
-
-.patients-item-row {
-  margin-bottom: 4px;
-}
-
-/* Actions (Edit + Delete buttons) */
-.patients-item-actions {
-  display: flex;
-  gap: 0.6rem;
-}
-
-/* Edit button */
-.patients-item-edit-btn {
-  padding: 0.45rem 0.9rem;
-  background-color: #0077cc;
-  color: white;
-  font-size: 13px;
-  font-weight: 600;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 150ms ease, transform 80ms ease;
-}
-
-.patients-item-edit-btn:hover {
-  background-color: #005fa3;
-  transform: translateY(-1px);
-}
-
-.patients-item-edit-btn:active {
-  transform: scale(0.98);
-}
-
-/* Delete button */
-.patients-item-delete-btn {
-  padding: 0.45rem 0.9rem;
-  background-color: #cc0000;
-  color: white;
-  font-size: 13px;
-  font-weight: 600;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 150ms ease, transform 80ms ease;
-}
-
-.patients-item-delete-btn:hover {
-  background-color: #a30000;
-  transform: translateY(-1px);
-}
-
-.patients-item-delete-btn:active {
-  transform: scale(0.98);
-}
-
-/* Required asterisk for mandatory fields */
-.required-asterisk {
-  color: red;
-  font-weight: bold;
+.error-text {
+  color: #b91c1c;
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
 }

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import PatientForm from "./components/PatientForm.jsx";
 import PatientList from "./components/PatientList.jsx";
+import PatientDetails from "./components/PatientDetails.jsx";
 import "./App.css";
 
 const STORAGE_KEY = "medicalcare_patients";
@@ -9,6 +10,7 @@ const STORAGE_KEY = "medicalcare_patients";
 function App() {
   const [patients, setPatients] = useState([]);
   const [editingIdNumber, setEditingIdNumber] = useState(null);
+  const [selectedIdNumber, setSelectedIdNumber] = useState(null); // חדש
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
 
   // טעינת מטופלים מה localStorage בטעינה ראשונית
@@ -73,16 +75,36 @@ function App() {
 
   const handleDeletePatient = (idNumber) => {
     console.log("Deleting patient with ID:", idNumber);
+
     setPatients((prev) => prev.filter((p) => p.idNumber !== idNumber));
 
     setEditingIdNumber((current) =>
       current === idNumber ? null : current
     );
+
+    setSelectedIdNumber((current) =>
+      current === idNumber ? null : current
+    );
+  };
+
+  // חדש - בחירה להצגת פרטי מטופל
+  const handleSelectPatient = (idNumber) => {
+    console.log("Viewing patient with ID:", idNumber);
+    setSelectedIdNumber(idNumber);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedIdNumber(null);
   };
 
   const editingPatient =
     editingIdNumber != null
       ? patients.find((p) => p.idNumber === editingIdNumber) || null
+      : null;
+
+  const selectedPatient =
+    selectedIdNumber != null
+      ? patients.find((p) => p.idNumber === selectedIdNumber) || null
       : null;
 
   return (
@@ -108,8 +130,19 @@ function App() {
           patients={patients}
           onEditPatient={handleStartEdit}
           onDeletePatient={handleDeletePatient}
+          onSelectPatient={handleSelectPatient} // חדש
         />
       </section>
+
+      {selectedPatient && (
+        <section className="app-section">
+          <h2 className="section-title">Patient details</h2>
+          <PatientDetails
+            patient={selectedPatient}
+            onClose={handleCloseDetails}
+          />
+        </section>
+      )}
     </div>
   );
 }

@@ -1,48 +1,58 @@
 // src/components/PatientList.jsx
+import React from "react";
+import "./PatientList.css";
 
-function PatientList({ patients, onEditPatient, onDeletePatient }) {
+function PatientList({
+  patients,
+  onEditPatient,
+  onDeletePatient,
+  onSelectPatient,
+}) {
   if (!patients || patients.length === 0) {
     return <p>No patients yet.</p>;
   }
 
   return (
-    <ul className="patients-list">
+    <ul className="patient-list">
       {patients.map((patient) => (
-        <li key={patient.idNumber} className="patients-item">
-          <div className="patients-item-content">
-            <div className="patients-item-row patients-item-main">
+        <li key={patient.idNumber} className="patient-list-item">
+          <div className="patient-list-main">
+            <span className="patient-list-name">
               {patient.firstName} {patient.lastName}
-            </div>
-            <div className="patients-item-row patients-item-sub">
-              ID: {patient.idNumber}
-            </div>
-            {patient.phone && (
-              <div className="patients-item-row patients-item-sub">
-                Phone: {patient.phone}
-              </div>
-            )}
-            {patient.email && (
-              <div className="patients-item-row patients-item-sub">
-                Email: {patient.email}
-              </div>
-            )}
+            </span>
+            <span className="patient-list-id">{patient.idNumber}</span>
           </div>
 
-          <div className="patients-item-actions">
-            <button
-              type="button"
-              className="patients-item-edit-btn"
-              onClick={() => onEditPatient(patient.idNumber)}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              className="patients-item-delete-btn"
-              onClick={() => onDeletePatient(patient.idNumber)}
-            >
-              Delete
-            </button>
+          <div className="patient-list-actions">
+            {onSelectPatient && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => onSelectPatient(patient.idNumber)}
+              >
+                View details
+              </button>
+            )}
+
+            {onEditPatient && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onEditPatient(patient.idNumber)}
+              >
+                Edit
+              </button>
+            )}
+
+            {onDeletePatient && (
+              <button
+                type="button"
+                className="danger-button"
+                onClick={() => onDeletePatient(patient.idNumber)}
+              >
+                Delete
+              </button>
+            )}
           </div>
         </li>
       ))}
@@ -51,3 +61,4 @@ function PatientList({ patients, onEditPatient, onDeletePatient }) {
 }
 
 export default PatientList;
+
