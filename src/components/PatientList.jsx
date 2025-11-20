@@ -1,36 +1,49 @@
 // src/components/PatientList.jsx
 
-function PatientList({ patients, onEditPatient }) {
+function PatientList({ patients, onEditPatient, onDeletePatient }) {
   if (!patients || patients.length === 0) {
     return <p>No patients yet.</p>;
   }
 
   return (
     <ul className="patients-list">
-      {patients.map((p) => (
-        <li key={p.idNumber} className="patients-item">
+      {patients.map((patient) => (
+        <li key={patient.idNumber} className="patients-item">
           <div className="patients-item-content">
-            <div className="patients-item-row">
-              <span className="patients-item-id">ID {p.idNumber}</span>
-              <span className="patients-item-main">
-                {p.firstName} {p.lastName}
-              </span>
+            <div className="patients-item-row patients-item-main">
+              {patient.firstName} {patient.lastName}
             </div>
-            <div className="patients-item-row">
-              <span className="patients-item-sub">
-                {p.dateOfBirth} {p.gender && `- ${p.gender}`}
-              </span>
+            <div className="patients-item-row patients-item-sub">
+              ID: {patient.idNumber}
             </div>
+            {patient.phone && (
+              <div className="patients-item-row patients-item-sub">
+                Phone: {patient.phone}
+              </div>
+            )}
+            {patient.email && (
+              <div className="patients-item-row patients-item-sub">
+                Email: {patient.email}
+              </div>
+            )}
           </div>
 
-          <button
-            type="button"
-            className="patients-item-edit-btn"
-            title="Edit patient"
-            onClick={() => onEditPatient(p.idNumber)}
-          >
-            Edit
-          </button>
+          <div className="patients-item-actions">
+            <button
+              type="button"
+              className="patients-item-edit-btn"
+              onClick={() => onEditPatient(patient.idNumber)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="patients-item-delete-btn"
+              onClick={() => onDeletePatient(patient.idNumber)}
+            >
+              Delete
+            </button>
+          </div>
         </li>
       ))}
     </ul>
@@ -38,4 +51,3 @@ function PatientList({ patients, onEditPatient }) {
 }
 
 export default PatientList;
-
