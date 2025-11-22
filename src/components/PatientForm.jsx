@@ -11,8 +11,14 @@ const initialFormState = {
   phone: "",
   email: "",
   address: "",
+  city: "",
+  country: "",
+  medicalIssues: "",
+  clinicalStatus: "",
   notes: "",
 };
+
+
 
 function PatientForm({
   onCreatePatient,
@@ -181,27 +187,75 @@ function PatientForm({
         />
       </div>
 
-      <div className="form-field form-full-width">
-        <label htmlFor="address">Address</label>
-        <input
-          id="address"
-          name="address"
-          type="text"
-          value={formData.address}
-          onChange={handleChange}
-        />
-      </div>
+      <div className="form-row">
+  <div className="form-field">
+    <label htmlFor="address">Address</label>
+    <input
+      id="address"
+      name="address"
+      type="text"
+      value={formData.address}
+      onChange={handleChange}
+      placeholder="Street and number"
+    />
+  </div>
+</div>
 
-      <div className="form-field form-full-width">
-        <label htmlFor="notes">Notes</label>
-        <textarea
-          id="notes"
-          name="notes"
-          rows="3"
-          value={formData.notes}
-          onChange={handleChange}
-        />
-      </div>
+
+      <div className="form-row">
+  <div className="form-field">
+    <label htmlFor="city">City</label>
+    <input
+      id="city"
+      name="city"
+      type="text"
+      value={formData.city}
+      onChange={handleChange}
+    />
+  </div>
+
+  <div className="form-field">
+    <label htmlFor="country">Country</label>
+    <input
+      id="country"
+      name="country"
+      type="text"
+      value={formData.country}
+      onChange={handleChange}
+    />
+  </div>
+</div>
+
+<div className="form-row">
+  <div className="form-field">
+    <label htmlFor="medicalIssues">Medical issues</label>
+    <textarea
+      id="medicalIssues"
+      name="medicalIssues"
+      rows={3}
+      value={formData.medicalIssues}
+      onChange={handleChange}
+      placeholder="Chronic conditions, injuries, risk factors"
+    />
+  </div>
+
+  <div className="form-field">
+    <label htmlFor="clinicalStatus">Clinical status</label>
+    <select
+      id="clinicalStatus"
+      name="clinicalStatus"
+      value={formData.clinicalStatus}
+      onChange={handleChange}
+    >
+      <option value="">Not set</option>
+      <option value="active">Active</option>
+      <option value="in-treatment">In treatment</option>
+      <option value="stable">Stable</option>
+      <option value="discharged">Discharged</option>
+    </select>
+  </div>
+</div>
+
 
       <div className="form-actions">
         {isEditing && (
