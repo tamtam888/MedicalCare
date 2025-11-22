@@ -7,12 +7,18 @@
 .patient-list-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.6rem 0.9rem;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   margin-bottom: 0.5rem;
   background-color: #fafafa;
+}
+
+.patient-list-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .patient-list-main {
@@ -28,6 +34,16 @@
 .patient-list-id {
   font-size: 0.8rem;
   color: #6b7280;
+}
+
+.patient-list-extra {
+  font-size: 0.85rem;
+  color: #374151;
+  line-height: 1.2;
+}
+
+.patient-list-field {
+  margin: 2px 0;
 }
 
 .patient-list-actions {
