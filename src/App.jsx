@@ -8,6 +8,113 @@ import "./App.css";
 
 const STORAGE_KEY = "patients";
 
+function toFhirPatient(patient) {
+  return {
+    resourceType: "Patient",
+    id: patient.idNumber || "",
+    identifier: [
+      {
+        system: "local-id-number",
+        value: patient.idNumber || "",
+      },
+    ],
+    name: [
+      {
+        given: [patient.firstName || ""],
+        family: patient.lastName || "",
+      },
+    ],
+    birthDate: patient.dateOfBirth || "",
+    gender: patient.gender || "",
+    telecom: [
+      patient.phone
+        ? { system: "phone", value: patient.phone }
+        : null,
+      patient.email
+        ? { system: "email", value: patient.email }
+        : null,
+    ].filter(Boolean),
+    address: [
+      {
+        text: patient.address || "",
+        city: patient.city || "",
+        country: patient.country || "",
+      },
+    ],
+    extension: [
+      patient.medicalIssues
+        ? {
+            url: "medical-issues",
+            valueString: patient.medicalIssues,
+          }
+        : null,
+      patient.clinicalStatus
+        ? {
+            url: "clinical-status",
+            valueString: patient.clinicalStatus,
+          }
+        : null,
+    ].filter(Boolean),
+    note: patient.notes
+      ? [
+          {
+            text: patient.notes,
+          },
+        ]
+      : [],
+  };
+}
+
+function fromFhirPatient(fhirPatient) {
+  const identifier = Array.isArray(fhirPatient.identifier)
+    ? fhirPatient.identifier[0] || {}
+    : {};
+  const name = Array.isArray(fhirPatient.name)
+    ? fhirPatient.name[0] || {}
+    : {};
+  const given = Array.isArray(name.given)
+    ? name.given[0] || ""
+    : "";
+  const telecom = Array.isArray(fhirPatient.telecom)
+    ? fhirPatient.telecom
+    : [];
+  const phone =
+    telecom.find((t) => t.system === "phone")?.value || "";
+  const email =
+    telecom.find((t) => t.system === "email")?.value || "";
+  const address = Array.isArray(fhirPatient.address)
+    ? fhirPatient.address[0] || {}
+    : {};
+  const extensions = Array.isArray(fhirPatient.extension)
+    ? fhirPatient.extension
+    : [];
+  const medicalIssuesExt = extensions.find(
+    (ext) => ext.url === "medical-issues"
+  );
+  const clinicalStatusExt = extensions.find(
+    (ext) => ext.url === "clinical-status"
+  );
+  const note = Array.isArray(fhirPatient.note)
+    ? fhirPatient.note[0]?.text || ""
+    : "";
+
+  return {
+    idNumber: (identifier.value || "").trim(),
+    firstName: given,
+    lastName: name.family || "",
+    dateOfBirth: fhirPatient.birthDate || "",
+    gender: fhirPatient.gender || "",
+    phone,
+    email,
+    address: address.text || "",
+    city: address.city || "",
+    country: address.country || "",
+    medicalIssues: medicalIssuesExt?.valueString || "",
+    clinicalStatus: clinicalStatusExt?.valueString || "",
+    notes: note,
+  };
+}
+
 function App() {
   // Load patients once from localStorage on first render
   const [patients, setPatients] = useState(() => {
@@ -31,7 +138,8 @@ function App() {
   });
 
   const [editingPatient, setEditingPatient] = useState(null);
-  const [selectedPatientIdNumber, setSelectedPatientIdNumber] = useState(null);
+  const [selectedPatientIdNumber, setSelectedPatientIdNumber] =
+    useState(null);
 
   // Persist patients to localStorage whenever they change
   useEffect(() => {
@@ -163,6 +271,117 @@ function App() {
     );
   };
 
+  const handleExportPatients = () => {
+    if (!patients.length) {
+      alert("No patients to export.");
+      return;
+    }
+
+    const fhirBundle = {
+      resourceType: "Bundle",
+      type: "collection",
+      entry: patients.map((p) => ({
+        resource: toFhirPatient(p),
+      })),
+    };
+
+    const blob = new Blob(
+      [JSON.stringify(fhirBundle, null, 2)],
+      { type: "application/json" }
+    );
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "patients-fhir.json";
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportPatients = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target.result);
+
+        if (
+          json.resourceType !== "Bundle" ||
+          !Array.isArray(json.entry)
+        ) {
+          alert("Invalid FHIR JSON file.");
+          return;
+        }
+
+        const importedResources = json.entry
+          .map((entry) => entry.resource)
+          .filter(
+            (res) => res && res.resourceType === "Patient"
+          );
+
+        if (!importedResources.length) {
+          alert("No Patient resources found in file.");
+          return;
+        }
+
+        const importedPatients = importedResources.map(
+          fromFhirPatient
+        );
+
+        setPatients((prev) => {
+          const map = new Map(
+            prev.map((p) => [
+              String(p.idNumber).trim(),
+              {
+                ...p,
+                history: Array.isArray(p.history)
+                  ? p.history
+                  : [],
+                reports: Array.isArray(p.reports)
+                  ? p.reports
+                  : [],
+              },
+            ])
+          );
+
+          importedPatients.forEach((imp) => {
+            const key = String(imp.idNumber || "").trim();
+            if (!key) return;
+
+            if (map.has(key)) {
+              const existing = map.get(key);
+              map.set(key, {
+                ...existing,
+                ...imp,
+                history: existing.history,
+                reports: existing.reports,
+              });
+            } else {
+              map.set(key, {
+                ...imp,
+                history: [],
+                reports: [],
+              });
+            }
+          });
+
+          return Array.from(map.values());
+        });
+
+        alert("Patients imported successfully.");
+      } catch (error) {
+        console.error("Failed to import patients", error);
+        alert("Failed to read JSON file.");
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
   return (
     <div className="app-container">
       <img src="/icon.png" alt="MedicalCare Icon" className="app-logo" />
@@ -191,6 +410,28 @@ function App() {
           onDeletePatient={handleDeletePatient}
           onSelectPatient={handleSelectPatient}
         />
+      </section>
+
+      <section className="app-section">
+        <h2 className="section-title">Export and import</h2>
+        <div className="export-import-controls">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={handleExportPatients}
+          >
+            Export patients (FHIR JSON)
+          </button>
+
+          <label className="import-label">
+            Import patients
+            <input
+              type="file"
+              accept="application/json"
+              onChange={handleImportPatients}
+            />
+          </label>
+        </div>
       </section>
 
       {selectedPatient && (
