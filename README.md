@@ -1,100 +1,150 @@
 # MedicalCare - Client Side Treatment Management System
 
-MedicalCare is a React based frontend application designed to help clinicians manage treatment sessions, transcriptions, care plans, reports and patient records.  
-This project focuses entirely on the client side (no backend), making it ideal as a portfolio project and suitable for open source integration in the future.
+MedicalCare is a modern React based client side application designed to support clinicians in managing patients, treatment sessions, transcription, clinical documentation and future care planning.
 
-The system supports therapy, rehabilitation, sports medicine, voice care and general clinical documentation workflows.
-
----
-
-## 🎯 Project Goals
-
-- Provide an intuitive interface for documenting and managing treatment sessions.
-- Enable real time or near real time transcription for clinical notes.
-- Allow therapists to create structured care plans for each patient.
-- Generate clear and professional treatment summary reports (PDF).
-- Provide a built in treatment calendar for scheduling and reminders.
-- Maintain a full digital patient record, stored locally on the client.
+The system is part of a larger professional project workflow, managed through Trello and Git branching strategy.  
+This README describes the MVP, core features and development flow without tying the project to specific filenames, so the structure can evolve freely during development.
 
 ---
 
-## 🧩 Core Features (MVP)
+## 🎯 MVP Scope (Based on Trello)
 
-### 1. Treatment Transcription
+The MVP focuses on the essential clinical workflow:  
+patient creation, documentation, transcription and report attachments.
 
-- Record audio from the device microphone.
-- Perform simple transcription (placeholder or external API).
-- Display transcription live on the screen.
-- Save session notes to the patient record.
-
----
-
-### 2. Care Plan Builder
-
-- Add therapy goals.
-- Add exercises, tasks or treatment steps.
-- Select treatment frequency and schedule.
-- Save the care plan for each patient.
-
----
-
-### 3. Treatment Summary Report (PDF)
-
-- Combine transcription + care plan into a single PDF.
-- Include patient details, notes and structured sections.
-- Generate and download the report.
-- Save previous reports inside the patient’s digital record.
-
----
-
-### 4. Treatment Calendar
-
-- Add future treatment sessions.
-- Choose dates and times using a calendar component.
-- Store the schedule in localStorage.
-- Display upcoming and past appointments in a clean interface.
-
----
-
-### 5. Digital Patient Record
+### 1. Digital Patient Record (Core)
 
 - Create and manage patient profiles.
-- View past sessions, care plans and reports.
-- Store all data locally (localStorage only).
-- Update or delete patient information when needed.
+- Validate required fields (ID number, phone, date of birth).
+- Block invalid or duplicate ID numbers.
+- Store patient data locally so the records persist after refresh.
+- Maintain structured patient information:
+  - Demographics and contact details
+  - Notes
+  - Treatment history
+  - Attached reports
+
+This is the foundation of the entire system.
 
 ---
 
-## 🛠️ Tech Stack
+### 2. Treatment Transcription - Audio Recording
 
-- React (Hooks)
+- Record audio using the browser's microphone.
+- Show recording controls (start, stop, reset).
+- Provide basic or mock transcription.
+- Allow the clinician to add transcriptions to the patient’s treatment history.
+- Prepare groundwork for advanced speech-to-text API integration.
+
+---
+
+### 3. Attach Clinical Reports
+
+- Upload and attach documents to a selected patient (PDF, images or other files).
+- Store metadata for each attached report.
+- Display attached documents inside the patient record.
+- Enable clinicians to quickly review previous materials.
+
+---
+
+### 4. Treatment History View
+
+- Display chronological treatment sessions for each patient.
+- Include:
+  - Transcriptions
+  - Notes
+  - Attached reports
+- Prepare the UI for future advanced modules (care plan, treatment calendar).
+
+---
+
+## 🔮 Next Planned Features (After MVP)
+
+These features are defined in Trello and will be implemented in separate feature branches after the MVP is complete.
+
+### Care Plan Builder
+
+- Create therapy goals per patient.
+- Add structured exercises, steps and instructions.
+- Define frequency and expected progress.
+- Integrate the plan into the patient’s history.
+
+### Treatment Calendar
+
+- Schedule upcoming treatments.
+- Choose dates and times from a calendar UI.
+- Store future appointments locally.
+- Allow clinicians to track upcoming and past sessions.
+
+### PDF Treatment Summary
+
+- Combine:
+  - Patient details
+  - Selected treatment history entries
+  - Care plan items
+- Generate a professional PDF treatment report.
+- Allow download, email or attaching the PDF to the patient record.
+
+---
+
+## 🛠️ Technology
+
+- React (Vite)
 - JavaScript (ES6+)
-- CSS
-- Web Audio API
-- LocalStorage
-- jsPDF (for PDF generation)
-- React Calendar or similar calendar library
+- CSS (per component styling)
+- LocalStorage (persistent client side data)
+- Web Audio API (microphone recording)
+- Planned:
+  - jsPDF for PDF export
+  - Calendar UI library for scheduling
+  - Optional integrations with external clinical APIs in the future
 
 ---
 
-## 📁 Suggested Project Structure
+## 📁 Project Structure Philosophy
 
-```text
-src/
-  components/
-    Transcription/
-    CarePlan/
-    PatientCard/
-    CalendarView/
-    ReportGenerator/
-  hooks/
-    useAudioRecorder.js
-    useLocalStorage.js
-  utils/
-    transcriptionMock.js
-    pdfBuilder.js
-    dateUtils.js
-  data/
-    mockPatients.json
-  App.jsx
-  main.jsx
+The project follows a simple and scalable structure:
+
+- **Components**: each feature is built as a separate reusable component.
+- **CSS per component**: clean visual separation.
+- **LocalStorage**: used as the local data layer.
+- **Trello**: tracks all user stories and development tasks.
+- **Feature branches**: isolate work without breaking main.
+
+No file names are included in this README to keep development flexible.
+
+---
+
+## 🌐 Development Flow (Trello + Git)
+
+1. Choose a Trello user story (MVP or planned).
+2. Create or switch to the appropriate `feature/...` branch.
+3. Build or refine the component for that feature.
+4. Add validation, accessibility, logic and UI.
+5. Test the feature locally (including page refresh and localStorage behavior).
+6. Update Trello status (In Progress → Review → Done).
+7. Merge the feature back into `main` when stable.
+
+This keeps the project clean, structured and professional.
+
+---
+
+## 💾 Data Persistence
+
+- All patient data is stored on the client only.
+- Records persist after refresh.
+- Storage is normalized so:
+  - `history` exists for every patient,
+  - `reports` exists for every patient.
+- No backend or server needed for the MVP.
+
+---
+
+## 🚀 How to Run Locally
+
+```bash
+git clone <your-repo-url>
+cd MedicalCare
+npm install
+npm run dev
+
