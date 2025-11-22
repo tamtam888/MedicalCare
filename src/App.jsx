@@ -5,6 +5,7 @@ import PatientList from "./components/PatientList";
 import PatientHistory from "./components/PatientHistory";
 import AttachReports from "./components/AttachReports";
 import "./App.css";
+import RecordAudio from "./components/RecordAudio";
 
 const STORAGE_KEY = "patients";
 
@@ -27,12 +28,8 @@ function toFhirPatient(patient) {
     birthDate: patient.dateOfBirth || "",
     gender: patient.gender || "",
     telecom: [
-      patient.phone
-        ? { system: "phone", value: patient.phone }
-        : null,
-      patient.email
-        ? { system: "email", value: patient.email }
-        : null,
+      patient.phone ? { system: "phone", value: patient.phone } : null,
+      patient.email ? { system: "email", value: patient.email } : null,
     ].filter(Boolean),
     address: [
       {
@@ -72,9 +69,7 @@ function fromFhirPatient(fhirPatient) {
   const name = Array.isArray(fhirPatient.name)
     ? fhirPatient.name[0] || {}
     : {};
-  const given = Array.isArray(name.given)
-    ? name.given[0] || ""
-    : "";
+  const given = Array.isArray(name.given) ? name.given[0] || "" : "";
   const telecom = Array.isArray(fhirPatient.telecom)
     ? fhirPatient.telecom
     : [];
@@ -116,7 +111,6 @@ function fromFhirPatient(fhirPatient) {
 }
 
 function App() {
-  // Load patients once from localStorage on first render
   const [patients, setPatients] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -141,7 +135,6 @@ function App() {
   const [selectedPatientIdNumber, setSelectedPatientIdNumber] =
     useState(null);
 
-  // Persist patients to localStorage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
@@ -157,7 +150,6 @@ function App() {
     const createdAt = new Date().toISOString();
     const idNumber = String(formData.idNumber).trim();
 
-    // Prevent duplicate ID numbers
     const exists = patients.some(
       (p) => String(p.idNumber).trim() === idNumber
     );
@@ -192,7 +184,6 @@ function App() {
     const newIdNumber = String(updatedData.idNumber).trim();
     const oldIdNumber = String(editingPatient.idNumber).trim();
 
-    // If ID number changed, ensure uniqueness
     if (newIdNumber !== oldIdNumber) {
       const exists = patients.some(
         (p) => String(p.idNumber).trim() === newIdNumber
@@ -285,10 +276,9 @@ function App() {
       })),
     };
 
-    const blob = new Blob(
-      [JSON.stringify(fhirBundle, null, 2)],
-      { type: "application/json" }
-    );
+    const blob = new Blob([JSON.stringify(fhirBundle, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
@@ -319,18 +309,14 @@ function App() {
 
         const importedResources = json.entry
           .map((entry) => entry.resource)
-          .filter(
-            (res) => res && res.resourceType === "Patient"
-          );
+          .filter((res) => res && res.resourceType === "Patient");
 
         if (!importedResources.length) {
           alert("No Patient resources found in file.");
           return;
         }
 
-        const importedPatients = importedResources.map(
-          fromFhirPatient
-        );
+        const importedPatients = importedResources.map(fromFhirPatient);
 
         setPatients((prev) => {
           const map = new Map(
@@ -338,12 +324,8 @@ function App() {
               String(p.idNumber).trim(),
               {
                 ...p,
-                history: Array.isArray(p.history)
-                  ? p.history
-                  : [],
-                reports: Array.isArray(p.reports)
-                  ? p.reports
-                  : [],
+                history: Array.isArray(p.history) ? p.history : [],
+                reports: Array.isArray(p.reports) ? p.reports : [],
               },
             ])
           );
@@ -380,6 +362,31 @@ function App() {
     };
 
     reader.readAsText(file);
+  };
+
+  const handleSaveTranscription = (idNumber, transcriptionText) => {
+    if (!idNumber || !transcriptionText || !transcriptionText.trim()) {
+      return;
+    }
+
+    const entry = {
+      id: crypto.randomUUID(),
+      type: "Transcription",
+      title: "Treatment transcription",
+      date: new Date().toISOString(),
+      summary: transcriptionText.trim(),
+    };
+
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.idNumber === idNumber
+          ? {
+              ...p,
+              history: [...(p.history || []), entry],
+            }
+          : p
+      )
+    );
   };
 
   return (
@@ -434,6 +441,14 @@ function App() {
         </div>
       </section>
 
+      <section className="app-section">
+        <h2 className="section-title">Treatment transcription</h2>
+        <RecordAudio
+          selectedPatient={selectedPatient}
+          onSaveTranscription={handleSaveTranscription}
+        />
+      </section>
+
       {selectedPatient && (
         <section className="app-section">
           <h2 className="section-title">
@@ -455,3 +470,4 @@ function App() {
 }
 
 export default App;
+
