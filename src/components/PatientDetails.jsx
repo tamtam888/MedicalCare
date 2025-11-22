@@ -5,6 +5,19 @@ import "./PatientDetails.css";
 function PatientDetails({ patient, onClose }) {
   if (!patient) return null;
 
+  const hasAddress =
+    patient.address || patient.city || patient.country;
+
+  const addressLine = hasAddress
+    ? [
+        patient.address,
+        patient.city,
+        patient.country,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "-";
+
   return (
     <div className="patient-details-card">
       <div className="patient-details-header">
@@ -25,7 +38,8 @@ function PatientDetails({ patient, onClose }) {
           <strong>ID number:</strong> {patient.idNumber}
         </div>
         <div>
-          <strong>Date of birth:</strong> {patient.dateOfBirth || "-"}
+          <strong>Date of birth:</strong>{" "}
+          {patient.dateOfBirth || "-"}
         </div>
         <div>
           <strong>Gender:</strong> {patient.gender || "-"}
@@ -37,8 +51,22 @@ function PatientDetails({ patient, onClose }) {
           <strong>Email:</strong> {patient.email || "-"}
         </div>
         <div>
-          <strong>Address:</strong> {patient.address || "-"}
+          <strong>Address:</strong> {addressLine}
         </div>
+        <div>
+          <strong>Clinical status:</strong>{" "}
+          {patient.clinicalStatus || "-"}
+        </div>
+      </div>
+
+      <div className="patient-details-notes">
+        <strong>Medical issues:</strong>
+        <p>
+          {patient.medicalIssues &&
+          patient.medicalIssues.trim() !== ""
+            ? patient.medicalIssues
+            : "No medical issues documented."}
+        </p>
       </div>
 
       <div className="patient-details-notes">

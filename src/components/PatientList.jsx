@@ -16,11 +16,36 @@ function PatientList({
     <ul className="patient-list">
       {patients.map((patient) => (
         <li key={patient.idNumber} className="patient-list-item">
-          <div className="patient-list-main">
-            <span className="patient-list-name">
-              {patient.firstName} {patient.lastName}
-            </span>
-            <span className="patient-list-id">{patient.idNumber}</span>
+          <div className="patient-list-left">
+            <div className="patient-list-main">
+              <span className="patient-list-name">
+                {patient.firstName} {patient.lastName}
+              </span>
+              <span className="patient-list-id">{patient.idNumber}</span>
+            </div>
+
+            <div className="patient-list-extra">
+              {(patient.address || patient.city || patient.country) && (
+                <p className="patient-list-field">
+                  <strong>Address:</strong>{" "}
+                  {patient.address || ""}
+                  {patient.city ? `, ${patient.city}` : ""}
+                  {patient.country ? `, ${patient.country}` : ""}
+                </p>
+              )}
+
+              {patient.medicalIssues && (
+                <p className="patient-list-field">
+                  <strong>Medical issues:</strong> {patient.medicalIssues}
+                </p>
+              )}
+
+              {patient.clinicalStatus && (
+                <p className="patient-list-field">
+                  <strong>Clinical status:</strong> {patient.clinicalStatus}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="patient-list-actions">
@@ -61,4 +86,3 @@ function PatientList({
 }
 
 export default PatientList;
-
