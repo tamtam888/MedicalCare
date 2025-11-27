@@ -1,17 +1,17 @@
-// src/components/PatientHistory.jsx
 import React, { useMemo, useState } from "react";
-
 
 function PatientHistory({ patient }) {
   const [filterType, setFilterType] = useState("all");
   const [searchText, setSearchText] = useState("");
 
-  // In the future you can merge sessions, notes, care plans etc.
-  // For now, we use patient.history as a single timeline array.
-  const allEntries = patient.history || [];
+  // חשוב! יצירת עותק חדש כדי למנוע כפילויות ברינדור כפול
+  const allEntries = useMemo(
+    () => [...(patient.history || [])],
+    [patient.history]
+  );
 
   const filteredEntries = useMemo(() => {
-    let entries = allEntries;
+    let entries = [...allEntries]; // גם כאן חובה להעתיק
 
     if (filterType !== "all") {
       entries = entries.filter((entry) => entry.type === filterType);
@@ -26,7 +26,7 @@ function PatientHistory({ patient }) {
       );
     }
 
-    return [...entries].sort(
+    return entries.sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
   }, [allEntries, filterType, searchText]);
