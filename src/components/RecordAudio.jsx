@@ -73,6 +73,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
   }, []);
 
   // Load last transcription for selected patient
+  // שינוי חשוב: התלות היא רק על idNumber, לא על כל האובייקט
   useEffect(() => {
     if (!selectedPatient || !Array.isArray(selectedPatient.history)) {
       setTranscription("");
@@ -88,7 +89,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
     } else {
       setTranscription("");
     }
-  }, [selectedPatient]);
+  }, [selectedPatient?.idNumber]);
 
   // Audio recording handlers
   const handleStartAudio = async () => {
@@ -179,7 +180,13 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
       return;
     }
 
-    onSaveTranscription(selectedPatient.idNumber, transcription.trim());
+    const clean = transcription.trim();
+
+    // שולחים להוק את ה־idNumber והטקסט
+    onSaveTranscription(selectedPatient.idNumber, clean);
+
+    // אחרי שמירה - מנקים את הטקסט כדי שהשדה יהיה ריק
+    setTranscription("");
   };
 
   // Cleanup on unmount
