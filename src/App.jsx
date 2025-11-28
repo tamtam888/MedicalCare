@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { usePatients } from "./hooks/usePatients";
 import DashboardPage from "./pages/DashboardPage";
 import PatientsPage from "./pages/PatientsPage";
+import PatientDataPage from "./pages/PatientDataPage";
 import PatientDetailsPage from "./pages/PatientDetailsPage";
 import { translations } from "./i18n/translations";
 import { medplum } from "./medplumClient";
@@ -98,11 +99,13 @@ function App() {
 
         <main className="app-main">
           <Routes>
+            {/* redirect root to dashboard */}
             <Route
               path="/"
               element={<Navigate to="/dashboard" replace />}
             />
 
+            {/* Dashboard */}
             <Route
               path="/dashboard"
               element={
@@ -113,6 +116,7 @@ function App() {
               }
             />
 
+            {/* Create or edit patient profile */}
             <Route
               path="/patients"
               element={
@@ -123,32 +127,44 @@ function App() {
               }
             />
 
+            {/* Full patient file by ID */}
             <Route
               path="/patients/:idNumber"
               element={
                 <PatientDetailsPage
+                  patients={patientsState.patients}
+                  selectedPatient={patientsState.selectedPatient}
+                  selectedPatientFullName={
+                    patientsState.selectedPatientFullName
+                  }
+                  handleSelectPatient={patientsState.handleSelectPatient}
+                  handleAddReport={patientsState.handleAddReport}
+                  handleSaveTranscription={
+                    patientsState.handleSaveTranscription
+                  }
+                  handleEditPatient={patientsState.handleEditPatient}
+                />
+              }
+            />
+
+            {/* Patient data - list, search, export or import */}
+            <Route
+              path="/data/patient"
+              element={
+                <PatientDataPage
                   {...patientsState}
                   language={language}
                 />
               }
             />
 
+            {/* Other placeholder pages */}
             <Route
               path="/users"
               element={
                 <SimplePage
                   title={t.pages.usersTitle}
                   text={t.pages.usersText}
-                />
-              }
-            />
-
-            <Route
-              path="/data/patient"
-              element={
-                <SimplePage
-                  title={t.pages.dataPatientTitle}
-                  text={t.pages.dataPatientText}
                 />
               }
             />
@@ -221,11 +237,6 @@ function App() {
                   text={t.pages.settingsText}
                 />
               }
-            />
-
-            <Route
-              path="*"
-              element={<Navigate to="/dashboard" replace />}
             />
           </Routes>
         </main>

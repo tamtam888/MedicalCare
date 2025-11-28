@@ -33,7 +33,7 @@ const hasMedplumSession = () => {
   }
 };
 
-/** FHIR mappers */
+/** Convert TO FHIR */
 function toFhirPatient(patient) {
   return {
     resourceType: "Patient",
@@ -79,6 +79,7 @@ function toFhirPatient(patient) {
   };
 }
 
+/** Convert FROM FHIR */
 function fromFhirPatient(fhirPatient) {
   const identifiers = ensureArray(fhirPatient.identifier);
 
@@ -112,6 +113,7 @@ function fromFhirPatient(fhirPatient) {
 }
 
 export function usePatients() {
+  /** Load from localStorage */
   const [patients, setPatients] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -128,7 +130,7 @@ export function usePatients() {
   const [selectedPatientIdNumber, setSelectedPatientIdNumber] =
     useState(null);
 
-  // persist to localStorage on every change
+  /** Save to localStorage */
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
@@ -138,7 +140,8 @@ export function usePatients() {
   }, [patients]);
 
   const selectedPatient =
-    patients.find((p) => p.idNumber === selectedPatientIdNumber) || null;
+    patients.find((p) => trimId(p.idNumber) === trimId(selectedPatientIdNumber)) ||
+    null;
 
   const selectedPatientFullName = selectedPatient
     ? [selectedPatient.firstName, selectedPatient.lastName]
@@ -146,7 +149,7 @@ export function usePatients() {
         .join(" ")
     : "";
 
-  // create
+  /** Create patient */
   const handleCreatePatient = async (formData) => {
     const createdAt = new Date().toISOString();
     const idNumber = trimId(formData.idNumber);
@@ -174,25 +177,21 @@ export function usePatients() {
       reports: [],
     });
 
-    // add locally
     setPatients((prev) => [...prev, newPatient]);
     setSelectedPatientIdNumber(idNumber);
     setEditingPatient(null);
 
-    // sync to Medplum
+    /** Sync to Medplum */
     if (hasMedplumSession()) {
       try {
         const fhirPatient = toFhirPatient(newPatient);
-        console.log("handleCreatePatient - FHIR payload:", fhirPatient);
         const created = await medplum.createResource(fhirPatient);
-        console.log("Patient created in Medplum:", created);
 
         if (created && created.id) {
-          const medplumId = created.id;
           setPatients((prev) =>
             prev.map((p) =>
               trimId(p.idNumber) === idNumber
-                ? { ...p, medplumId }
+                ? { ...p, medplumId: created.id }
                 : p
             )
           );
@@ -203,7 +202,7 @@ export function usePatients() {
     }
   };
 
-  // update
+  /** Update patient */
   const handleUpdatePatient = async (updatedData) => {
     if (!editingPatient) return;
 
@@ -224,7 +223,7 @@ export function usePatients() {
 
     setPatients((prev) =>
       prev.map((p) => {
-        if (p.idNumber !== editingPatient.idNumber) return p;
+        if (trimId(p.idNumber) !== oldIdNumber) return p;
 
         const updatedPatient = normalizePatient({
           ...p,
@@ -240,62 +239,32 @@ export function usePatients() {
     setEditingPatient(null);
     setSelectedPatientIdNumber(newIdNumber);
 
+    /** Sync with Medplum */
     if (hasMedplumSession() && updatedPatientRef) {
       try {
         const baseFhir = toFhirPatient(updatedPatientRef);
 
         if (updatedPatientRef.medplumId) {
-          const updatedFhir = {
+          await medplum.updateResource({
             ...baseFhir,
             id: updatedPatientRef.medplumId,
-          };
-          const saved = await medplum.updateResource(updatedFhir);
-          console.log("Patient updated in Medplum:", saved);
+          });
         } else {
           const searchBundle = await medplum.search("Patient", {
             identifier: `${ID_SYSTEM}|${newIdNumber}`,
           });
+
           const existingResource =
             searchBundle.entry?.[0]?.resource || null;
 
           if (existingResource) {
-            const updatedFhir = {
+            await medplum.updateResource({
               ...existingResource,
               ...baseFhir,
               id: existingResource.id,
-            };
-            const saved = await medplum.updateResource(updatedFhir);
-            console.log(
-              "Patient updated in Medplum (found by identifier):",
-              saved
-            );
-
-            if (saved && saved.id) {
-              const medplumId = saved.id;
-              setPatients((prev) =>
-                prev.map((p) =>
-                  trimId(p.idNumber) === newIdNumber
-                    ? { ...p, medplumId }
-                    : p
-                )
-              );
-            }
+            });
           } else {
-            const created = await medplum.createResource(baseFhir);
-            console.log(
-              "Patient not found in Medplum, created new:",
-              created
-            );
-            if (created && created.id) {
-              const medplumId = created.id;
-              setPatients((prev) =>
-                prev.map((p) =>
-                  trimId(p.idNumber) === newIdNumber
-                    ? { ...p, medplumId }
-                    : p
-                )
-              );
-            }
+            await medplum.createResource(baseFhir);
           }
         }
       } catch (error) {
@@ -307,73 +276,91 @@ export function usePatients() {
   const handleCancelEdit = () => setEditingPatient(null);
 
   const handleEditPatient = (idNumber) => {
-    if (!idNumber) {
-      setEditingPatient(null);
-      return;
-    }
-    const patient = patients.find((p) => p.idNumber === idNumber);
+    const patient = patients.find(
+      (p) => trimId(p.idNumber) === trimId(idNumber)
+    );
     if (!patient) return;
 
     setEditingPatient(patient);
     setSelectedPatientIdNumber(idNumber);
   };
 
-  // delete - also deletes from Medplum when possible
+  /** Delete patient */
   const handleDeletePatient = async (idNumber) => {
     const id = trimId(idNumber);
     if (!id) return;
 
-    const patient = patients.find(
-      (p) => trimId(p.idNumber) === id
-    );
+    const patient = patients.find((p) => trimId(p.idNumber) === id);
 
-    if (hasMedplumSession() && patient && patient.medplumId) {
+    if (hasMedplumSession() && patient) {
       try {
-        await medplum.deleteResource("Patient", patient.medplumId);
+        let targetId = patient.medplumId || null;
+
+        if (!targetId) {
+          const searchBundle = await medplum.search("Patient", {
+            identifier: `${ID_SYSTEM}|${id}`,
+          });
+
+          const existingResource =
+            searchBundle.entry?.[0]?.resource || null;
+
+          if (existingResource?.id) targetId = existingResource.id;
+        }
+
+        if (targetId) {
+          await medplum.deleteResource("Patient", targetId);
+        }
       } catch (error) {
         console.error("Failed to delete patient in Medplum", error);
-        alert("Failed to delete patient from Medplum. Please try again.");
+        alert("Failed to delete patient from Medplum.");
         return;
       }
     }
 
-    setPatients((prev) => prev.filter((p) => trimId(p.idNumber) !== id));
+    setPatients((prev) =>
+      prev.filter((p) => trimId(p.idNumber) !== id)
+    );
 
-    if (selectedPatientIdNumber === id) {
+    if (trimId(selectedPatientIdNumber) === id)
       setSelectedPatientIdNumber(null);
-    }
 
-    if (editingPatient && trimId(editingPatient.idNumber) === id) {
+    if (
+      editingPatient &&
+      trimId(editingPatient.idNumber) === id
+    )
       setEditingPatient(null);
-    }
   };
 
+  /** Select */
   const handleSelectPatient = (idNumber) => {
     setSelectedPatientIdNumber(idNumber);
   };
 
+  /** Add PDF Report */
   const handleAddReport = (idNumber, reportMeta) => {
     setPatients((prev) =>
       prev.map((p) => {
-        if (p.idNumber !== idNumber) return p;
+        if (trimId(p.idNumber) !== trimId(idNumber)) return p;
 
         const reports = [...ensureArray(p.reports), reportMeta];
 
-        const historyEntry = {
-          id: reportMeta.id,
-          type: "Report",
-          title: `Report attached: ${reportMeta.name}`,
-          date: reportMeta.uploadedAt,
-          summary: "PDF report was attached to the patient profile.",
-        };
-
-        const history = [...ensureArray(p.history), historyEntry];
+        const history = [
+          ...ensureArray(p.history),
+          {
+            id: reportMeta.id,
+            type: "Report",
+            title: `Report attached: ${reportMeta.name}`,
+            date: reportMeta.uploadedAt,
+            summary: "PDF report was attached to the patient profile.",
+          },
+        ];
 
         return { ...p, reports, history };
       })
     );
   };
 
+  /** Export FHIR JSON */
   const handleExportPatients = () => {
     if (!patients.length) {
       alert("No patients to export.");
@@ -399,6 +386,7 @@ export function usePatients() {
     URL.revokeObjectURL(url);
   };
 
+  /** Import FHIR JSON */
   const handleImportPatients = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -419,7 +407,7 @@ export function usePatients() {
           .filter((res) => res && res.resourceType === "Patient");
 
         if (!importedResources.length) {
-          alert("No Patient resources found in file.");
+          alert("No Patient resources found.");
           return;
         }
 
@@ -453,56 +441,37 @@ export function usePatients() {
         alert("Patients imported successfully.");
       } catch (error) {
         console.error("Failed to import patients", error);
-        alert("Failed to read JSON file.");
+        alert("Import failed.");
       }
     };
 
     reader.readAsText(file);
   };
 
+  /** Save Transcription (ALWAYS NEW ENTRY) */
   const handleSaveTranscription = (idNumber, transcriptionText) => {
-    if (!idNumber || !transcriptionText || !transcriptionText.trim()) {
-      return;
-    }
+    const trimmedId = trimId(idNumber);
+    const cleanText = transcriptionText?.trim();
+    if (!trimmedId || !cleanText) return;
 
-    const cleanText = transcriptionText.trim();
     const now = new Date().toISOString();
 
     setPatients((prev) =>
       prev.map((p) => {
-        if (p.idNumber !== idNumber) return p;
+        if (trimId(p.idNumber) !== trimmedId) return p;
 
         const history = [...ensureArray(p.history)];
 
-        let lastIndex = -1;
-        for (let i = history.length - 1; i >= 0; i -= 1) {
-          if (history[i].type === "Transcription") {
-            lastIndex = i;
-            break;
-          }
-        }
+        // Always add a NEW history entry
+        history.push({
+          id: crypto.randomUUID(),
+          type: "Transcription",
+          title: "Treatment transcription",
+          date: now,
+          summary: cleanText,
+        });
 
-        if (lastIndex === -1) {
-          history.push({
-            id: crypto.randomUUID(),
-            type: "Transcription",
-            title: "Treatment transcription",
-            date: now,
-            summary: cleanText,
-          });
-        } else {
-          const previous = history[lastIndex];
-          history[lastIndex] = {
-            ...previous,
-            date: now,
-            summary: cleanText,
-          };
-        }
-
-        return {
-          ...p,
-          history,
-        };
+        return { ...p, history };
       })
     );
   };
@@ -512,6 +481,7 @@ export function usePatients() {
     selectedPatient,
     selectedPatientFullName,
     editingPatient,
+
     handleCreatePatient,
     handleUpdatePatient,
     handleCancelEdit,
@@ -524,3 +494,4 @@ export function usePatients() {
     handleSaveTranscription,
   };
 }
+
