@@ -1,8 +1,8 @@
-// src/hooks/usePatients.js
 import { useEffect, useState } from "react";
 import { medplum } from "../medplumClient";
 
 const STORAGE_KEY = "patients";
+const BACKUP_KEY = "patients_backup";
 const ID_SYSTEM = "https://medicalcare.local/id-number";
 
 /** Helpers */
@@ -21,7 +21,7 @@ const normalizePatient = (p) => ({
   reports: ensureArray(p.reports),
 });
 
-/** Check Medplum session */
+/** Medplum session */
 const hasMedplumSession = () => {
   try {
     const isAuth = medplum.isAuthenticated();
@@ -33,7 +33,7 @@ const hasMedplumSession = () => {
   }
 };
 
-/** Convert TO FHIR */
+/** Convert TO FHIR Patient */
 function toFhirPatient(patient) {
   return {
     resourceType: "Patient",
@@ -79,7 +79,39 @@ function toFhirPatient(patient) {
   };
 }
 
-/** Convert FROM FHIR */
+/** History item -> FHIR Observation */
+function historyItemToObservation(patient, item, index) {
+  const patientRef = `Patient/${patient.idNumber || ""}`;
+  return {
+    resourceType: "Observation",
+    id: item.id || `${patient.idNumber || "patient"}-history-${index + 1}`,
+    status: "final",
+    subject: { reference: patientRef },
+    effectiveDateTime: item.date || "",
+    code: {
+      text: item.title || item.type || "History item",
+    },
+    valueString: item.summary || "",
+  };
+}
+
+/** Report item -> FHIR DiagnosticReport */
+function reportToDiagnosticReport(patient, report, index) {
+  const patientRef = `Patient/${patient.idNumber || ""}`;
+  return {
+    resourceType: "DiagnosticReport",
+    id: report.id || `${patient.idNumber || "patient"}-report-${index + 1}`,
+    status: "final",
+    subject: { reference: patientRef },
+    effectiveDateTime: report.date || report.uploadedAt || "",
+    code: {
+      text: report.type || "Report",
+    },
+    conclusion: report.description || report.name || "",
+  };
+}
+
+/** Convert FROM FHIR Patient */
 function fromFhirPatient(fhirPatient) {
   const identifiers = ensureArray(fhirPatient.identifier);
 
@@ -113,15 +145,52 @@ function fromFhirPatient(fhirPatient) {
 }
 
 export function usePatients() {
-  /** Load from localStorage */
+  /** Load from localStorage with backup support */
   const [patients, setPatients] = useState(() => {
     try {
+      let parsed = [];
+      let parsedBackup = [];
+
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
-      const parsed = JSON.parse(stored);
-      return parsed.map(normalizePatient);
+      if (stored) {
+        try {
+          const tmp = JSON.parse(stored);
+          if (Array.isArray(tmp)) {
+            parsed = tmp;
+          }
+        } catch (e) {
+          console.error("Failed to parse patients from STORAGE_KEY", e);
+        }
+      }
+
+      const backup = localStorage.getItem(BACKUP_KEY);
+      if (backup) {
+        try {
+          const tmpBackup = JSON.parse(backup);
+          if (Array.isArray(tmpBackup)) {
+            parsedBackup = tmpBackup;
+          }
+        } catch (e) {
+          console.error("Failed to parse patients from BACKUP_KEY", e);
+        }
+      }
+
+      if (parsed.length > 0) {
+        console.log("Loaded patients from STORAGE_KEY", parsed);
+        return parsed.map(normalizePatient);
+      }
+
+      if (parsedBackup.length > 0) {
+        console.warn(
+          "Loaded patients from BACKUP_KEY because STORAGE_KEY was empty"
+        );
+        return parsedBackup.map(normalizePatient);
+      }
+
+      console.log("No patients found in storage, starting with empty list");
+      return [];
     } catch (error) {
-      console.error("Failed to parse patients from localStorage", error);
+      console.error("Failed to load patients from storage", error);
       return [];
     }
   });
@@ -130,18 +199,76 @@ export function usePatients() {
   const [selectedPatientIdNumber, setSelectedPatientIdNumber] =
     useState(null);
 
-  /** Save to localStorage */
+  /** Save to localStorage with backup */
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
+      const json = JSON.stringify(patients);
+      localStorage.setItem(STORAGE_KEY, json);
+
+      if (Array.isArray(patients) && patients.length > 0) {
+        localStorage.setItem(BACKUP_KEY, json);
+      }
+
+      console.log("Saved patients to localStorage", patients);
     } catch (error) {
       console.error("Failed to save patients to localStorage", error);
     }
   }, [patients]);
 
+  /** Initial sync from Medplum if local storage is empty but Medplum has data */
+  useEffect(() => {
+    async function syncFromMedplumIfEmpty() {
+      if (!hasMedplumSession()) {
+        return;
+      }
+
+      if (patients && patients.length > 0) {
+        return;
+      }
+
+      try {
+        console.log(
+          "[Medplum sync] Local patients empty, loading from Medplum"
+        );
+        const bundle = await medplum.search("Patient", {
+          _count: 100,
+        });
+
+        const resources = Array.isArray(bundle.entry)
+          ? bundle.entry
+              .map((e) => e.resource)
+              .filter((r) => r && r.resourceType === "Patient")
+          : [];
+
+        const imported = resources.map(fromFhirPatient);
+
+        if (imported.length > 0) {
+          setPatients((prev) => {
+            if (prev && prev.length > 0) {
+              return prev;
+            }
+            console.log(
+              "[Medplum sync] Setting patients from Medplum search",
+              imported
+            );
+            return imported;
+          });
+        }
+      } catch (error) {
+        console.error(
+          "[Medplum sync] Failed to load patients from Medplum",
+          error
+        );
+      }
+    }
+
+    syncFromMedplumIfEmpty();
+  }, [patients, setPatients]);
+
   const selectedPatient =
-    patients.find((p) => trimId(p.idNumber) === trimId(selectedPatientIdNumber)) ||
-    null;
+    patients.find(
+      (p) => trimId(p.idNumber) === trimId(selectedPatientIdNumber)
+    ) || null;
 
   const selectedPatientFullName = selectedPatient
     ? [selectedPatient.firstName, selectedPatient.lastName]
@@ -202,7 +329,7 @@ export function usePatients() {
     }
   };
 
-  /** Update patient */
+  /** Update patient from form (PatientsPage) */
   const handleUpdatePatient = async (updatedData) => {
     if (!editingPatient) return;
 
@@ -273,6 +400,76 @@ export function usePatients() {
     }
   };
 
+  /** Update patient directly from PatientDetailsPage */
+  const handleUpdatePatientInline = async (updatedPatient) => {
+    if (!updatedPatient) return;
+
+    const idNumber = trimId(updatedPatient.idNumber);
+    if (!idNumber) return;
+
+    console.log("[handleUpdatePatientInline] incoming", updatedPatient);
+
+    let updatedPatientRef = null;
+
+    setPatients((prev) => {
+      const next = prev.map((p) => {
+        if (trimId(p.idNumber) !== idNumber) return p;
+
+        const merged = normalizePatient({
+          ...p,
+          ...updatedPatient,
+          idNumber,
+        });
+
+        updatedPatientRef = merged;
+        return merged;
+      });
+
+      console.log("[handleUpdatePatientInline] after setPatients", next);
+      return next;
+    });
+
+    setSelectedPatientIdNumber(idNumber);
+
+    if (!hasMedplumSession() || !updatedPatientRef) {
+      console.log("[handleUpdatePatientInline] skip Medplum sync");
+      return;
+    }
+
+    try {
+      const baseFhir = toFhirPatient(updatedPatientRef);
+
+      if (updatedPatientRef.medplumId) {
+        await medplum.updateResource({
+          ...baseFhir,
+          id: updatedPatientRef.medplumId,
+        });
+      } else {
+        const searchBundle = await medplum.search("Patient", {
+          identifier: `${ID_SYSTEM}|${idNumber}`,
+        });
+
+        const existingResource =
+          searchBundle.entry?.[0]?.resource || null;
+
+        if (existingResource) {
+          await medplum.updateResource({
+            ...existingResource,
+            ...baseFhir,
+            id: existingResource.id,
+          });
+        } else {
+          await medplum.createResource(baseFhir);
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Failed to update patient from details page in Medplum",
+        error
+      );
+    }
+  };
+
   const handleCancelEdit = () => setEditingPatient(null);
 
   const handleEditPatient = (idNumber) => {
@@ -321,14 +518,13 @@ export function usePatients() {
       prev.filter((p) => trimId(p.idNumber) !== id)
     );
 
-    if (trimId(selectedPatientIdNumber) === id)
+    if (trimId(selectedPatientIdNumber) === id) {
       setSelectedPatientIdNumber(null);
+    }
 
-    if (
-      editingPatient &&
-      trimId(editingPatient.idNumber) === id
-    )
+    if (editingPatient && trimId(editingPatient.idNumber) === id) {
       setEditingPatient(null);
+    }
   };
 
   /** Select */
@@ -360,19 +556,36 @@ export function usePatients() {
     );
   };
 
-  /** Export FHIR JSON */
+  /** Export FHIR JSON (patients + history + reports) */
   const handleExportPatients = () => {
     if (!patients.length) {
       alert("No patients to export.");
       return;
     }
 
+    const entries = [];
+
+    patients.forEach((p) => {
+      const patientResource = toFhirPatient(p);
+      entries.push({ resource: patientResource });
+
+      ensureArray(p.history).forEach((item, index) => {
+        entries.push({
+          resource: historyItemToObservation(p, item, index),
+        });
+      });
+
+      ensureArray(p.reports).forEach((report, index) => {
+        entries.push({
+          resource: reportToDiagnosticReport(p, report, index),
+        });
+      });
+    });
+
     const fhirBundle = {
       resourceType: "Bundle",
       type: "collection",
-      entry: patients.map((p) => ({
-        resource: toFhirPatient(p),
-      })),
+      entry: entries,
     };
 
     const blob = new Blob([JSON.stringify(fhirBundle, null, 2)], {
@@ -386,7 +599,7 @@ export function usePatients() {
     URL.revokeObjectURL(url);
   };
 
-  /** Import FHIR JSON */
+  /** Import FHIR JSON (patients + history + reports) */
   const handleImportPatients = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -397,21 +610,68 @@ export function usePatients() {
       try {
         const json = JSON.parse(e.target.result);
 
-        if (json.resourceType !== "Bundle" || !Array.isArray(json.entry)) {
+        if (
+          json.resourceType !== "Bundle" ||
+          !Array.isArray(json.entry)
+        ) {
           alert("Invalid FHIR JSON file.");
           return;
         }
 
-        const importedResources = json.entry
+        const resources = json.entry
           .map((entry) => entry.resource)
-          .filter((res) => res && res.resourceType === "Patient");
+          .filter(Boolean);
 
-        if (!importedResources.length) {
-          alert("No Patient resources found.");
-          return;
-        }
+        const patientResources = resources.filter(
+          (res) => res.resourceType === "Patient"
+        );
+        const observationResources = resources.filter(
+          (res) => res.resourceType === "Observation"
+        );
+        const diagnosticResources = resources.filter(
+          (res) => res.resourceType === "DiagnosticReport"
+        );
 
-        const importedPatients = importedResources.map(fromFhirPatient);
+        const importedPatients = patientResources.map(fromFhirPatient);
+
+        const historyByIdNumber = new Map();
+        observationResources.forEach((obs) => {
+          const ref = obs.subject?.reference || "";
+          const match = ref.match(/^Patient\/(.+)$/);
+          if (!match) return;
+          const idNumber = trimId(match[1]);
+          if (!idNumber) return;
+
+          const list = historyByIdNumber.get(idNumber) || [];
+          list.push({
+            id: obs.id || crypto.randomUUID(),
+            type: "Transcription",
+            title: obs.code?.text || "History item",
+            date: obs.effectiveDateTime || "",
+            summary: obs.valueString || "",
+          });
+          historyByIdNumber.set(idNumber, list);
+        });
+
+        const reportsByIdNumber = new Map();
+        diagnosticResources.forEach((dr) => {
+          const ref = dr.subject?.reference || "";
+          const match = ref.match(/^Patient\/(.+)$/);
+          if (!match) return;
+          const idNumber = trimId(match[1]);
+          if (!idNumber) return;
+
+          const list = reportsByIdNumber.get(idNumber) || [];
+          list.push({
+            id: dr.id || crypto.randomUUID(),
+            name: dr.code?.text || "Report",
+            type: dr.code?.text || "Report",
+            date: dr.effectiveDateTime || "",
+            uploadedAt: dr.effectiveDateTime || "",
+            description: dr.conclusion || "",
+          });
+          reportsByIdNumber.set(idNumber, list);
+        });
 
         setPatients((prev) => {
           const map = new Map(
@@ -422,16 +682,34 @@ export function usePatients() {
             const key = trimId(imp.idNumber);
             if (!key) return;
 
+            const importedHistory =
+              historyByIdNumber.get(key) || [];
+            const importedReports =
+              reportsByIdNumber.get(key) || [];
+
             if (map.has(key)) {
               const existing = map.get(key);
               map.set(key, {
                 ...existing,
                 ...imp,
-                history: existing.history,
-                reports: existing.reports,
+                history:
+                  existing.history && existing.history.length
+                    ? existing.history
+                    : importedHistory,
+                reports:
+                  existing.reports && existing.reports.length
+                    ? existing.reports
+                    : importedReports,
               });
             } else {
-              map.set(key, imp);
+              map.set(
+                key,
+                normalizePatient({
+                  ...imp,
+                  history: importedHistory,
+                  reports: importedReports,
+                })
+              );
             }
           });
 
@@ -448,7 +726,7 @@ export function usePatients() {
     reader.readAsText(file);
   };
 
-  /** Save Transcription (ALWAYS NEW ENTRY) */
+  /** Save Transcription (always new entry) */
   const handleSaveTranscription = (idNumber, transcriptionText) => {
     const trimmedId = trimId(idNumber);
     const cleanText = transcriptionText?.trim();
@@ -462,7 +740,6 @@ export function usePatients() {
 
         const history = [...ensureArray(p.history)];
 
-        // Always add a NEW history entry
         history.push({
           id: crypto.randomUUID(),
           type: "Transcription",
@@ -484,6 +761,7 @@ export function usePatients() {
 
     handleCreatePatient,
     handleUpdatePatient,
+    handleUpdatePatientInline,
     handleCancelEdit,
     handleEditPatient,
     handleDeletePatient,
@@ -494,4 +772,3 @@ export function usePatients() {
     handleSaveTranscription,
   };
 }
-
