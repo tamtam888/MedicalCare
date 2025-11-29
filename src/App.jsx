@@ -140,7 +140,12 @@ function App() {
                   }
                   handleEditPatient={patientsState.handleEditPatient}
                   onUpdatePatient={patientsState.handleUpdatePatientInline}
-                  handleImportPatient={undefined}
+                  handleExportPatients={
+                    patientsState.handleExportPatients
+                  }
+                  handleImportPatients={
+                    patientsState.handleImportPatients
+                  }
                 />
               }
             />

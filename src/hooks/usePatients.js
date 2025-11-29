@@ -1,3 +1,4 @@
+// src/hooks/usePatients.js
 import { useEffect, useState } from "react";
 import { medplum } from "../medplumClient";
 
@@ -14,10 +15,19 @@ const findTelecom = (telecom, system) =>
 const findExtension = (extensions, url) =>
   (extensions.find((ext) => ext.url === url) || {}).valueString || "";
 
+/**
+ * Normalize patient object so it always has:
+ * - medplumId
+ * - history: array, and each item can include audioData (for saved audio)
+ * - reports: array
+ */
 const normalizePatient = (p) => ({
   ...p,
   medplumId: p.medplumId || null,
-  history: ensureArray(p.history),
+  history: ensureArray(p.history).map((item) => ({
+    ...item,
+    audioData: item.audioData || null,
+  })),
   reports: ensureArray(p.reports),
 });
 
@@ -92,6 +102,7 @@ function historyItemToObservation(patient, item, index) {
       text: item.title || item.type || "History item",
     },
     valueString: item.summary || "",
+    // אפשר בעתיד להוסיף כאן extension לאודיו אם תרצי
   };
 }
 
@@ -299,6 +310,7 @@ export function usePatients() {
           title: "Patient profile created",
           date: createdAt,
           summary: "Initial patient profile was created in the system.",
+          audioData: null,
         },
       ],
       reports: [],
@@ -548,6 +560,7 @@ export function usePatients() {
             title: `Report attached: ${reportMeta.name}`,
             date: reportMeta.uploadedAt,
             summary: "PDF report was attached to the patient profile.",
+            audioData: null,
           },
         ];
 
@@ -649,6 +662,7 @@ export function usePatients() {
             title: obs.code?.text || "History item",
             date: obs.effectiveDateTime || "",
             summary: obs.valueString || "",
+            audioData: null,
           });
           historyByIdNumber.set(idNumber, list);
         });
@@ -713,7 +727,8 @@ export function usePatients() {
             }
           });
 
-          return Array.from(map.values());
+          // לוודא שכל המטופלים אחרי האימפורט מנורמלים (כולל audioData)
+          return Array.from(map.values()).map(normalizePatient);
         });
 
         alert("Patients imported successfully.");
@@ -726,11 +741,18 @@ export function usePatients() {
     reader.readAsText(file);
   };
 
-  /** Save Transcription (always new entry) */
-  const handleSaveTranscription = (idNumber, transcriptionText) => {
+  /** Save Transcription (text + optional audioData) */
+  const handleSaveTranscription = (
+    idNumber,
+    transcriptionText,
+    audioData
+  ) => {
     const trimmedId = trimId(idNumber);
-    const cleanText = transcriptionText?.trim();
-    if (!trimmedId || !cleanText) return;
+    const cleanText = (transcriptionText || "").trim();
+    const cleanAudio = audioData || null;
+
+    if (!trimmedId) return;
+    if (!cleanText && !cleanAudio) return;
 
     const now = new Date().toISOString();
 
@@ -746,6 +768,7 @@ export function usePatients() {
           title: "Treatment transcription",
           date: now,
           summary: cleanText,
+          audioData: cleanAudio,
         });
 
         return { ...p, history };
