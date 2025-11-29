@@ -2,9 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PatientList from "../components/PatientList";
-import PatientHistory from "../components/PatientHistory";
-import AttachReports from "../components/AttachReports";
-import RecordAudio from "../components/RecordAudio";
+import "./PatientDataPage.css";
 
 function PatientDataPage({
   patients,
@@ -33,14 +31,7 @@ function PatientDataPage({
 
   const openPatientDetails = (idNumber) => {
     if (!idNumber) return;
-    handleSelectPatient(idNumber);
     navigate(`/patients/${idNumber}`);
-  };
-
-  const openEditForm = (idNumber) => {
-    if (!idNumber) return;
-    handleEditPatient(idNumber);
-    navigate("/patients");
   };
 
   const handleSearchSubmit = (event) => {
@@ -61,83 +52,79 @@ function PatientDataPage({
   };
 
   return (
-    <div className="app-container">
-      <h1 className="app-title">Patient data</h1>
+    <div className="patient-data-page app-container">
+      <header className="patient-data-header">
+        <h1 className="app-title patient-data-title">Patient data</h1>
+        <p className="patient-data-subtitle">
+          Search, view and manage patient records
+        </p>
+      </header>
 
-      <section className="app-section">
+      {/* Search by ID */}
+      <section className="app-section patient-data-section">
         <h2 className="section-title">Search patient by ID</h2>
         <form className="patient-search-form" onSubmit={handleSearchSubmit}>
           <input
             type="text"
-            className="text-input"
+            className="text-input patient-search-input"
             placeholder="Enter ID number"
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
           />
-          <button type="submit" className="primary-button">
+          <button type="submit" className="primary-button patient-search-button">
             Find patient
           </button>
         </form>
       </section>
 
-      <section className="app-section">
-        <h2 className="section-title">Patient list</h2>
+      {/* Patient list */}
+      <section className="app-section patient-data-section">
+        <div className="patient-data-section-header">
+          <h2 className="section-title">Patient list</h2>
+          {filteredPatients && filteredPatients.length > 0 && (
+            <span className="patient-count">
+              {filteredPatients.length} patients
+            </span>
+          )}
+        </div>
+
         <PatientList
           patients={filteredPatients}
-          onEditPatient={openEditForm}
           onDeletePatient={handleDeletePatient}
           onSelectPatient={openPatientDetails}
         />
       </section>
 
-      <section className="app-section">
+      {/* Export and import */}
+      <section className="app-section patient-data-section">
         <h2 className="section-title">Export and import patients</h2>
+        <p className="patient-data-helper-text">
+          Export all patients as FHIR JSON or import patients from another
+          system.
+        </p>
+
         <div className="export-import-controls">
           <button
             type="button"
-            className="primary-button"
+            className="primary-button export-button"
             onClick={handleExportPatients}
           >
             Export patients (FHIR JSON)
           </button>
 
           <label className="import-label">
-            Import patients
+            <span className="import-label-text">Import patients</span>
             <input
               type="file"
               accept="application/json"
               onChange={handleImportPatients}
+              className="import-input"
             />
           </label>
         </div>
       </section>
-
-      <section className="app-section">
-        <h2 className="section-title">Treatment transcription</h2>
-        <RecordAudio
-          selectedPatient={selectedPatient}
-          onSaveTranscription={handleSaveTranscription}
-        />
-      </section>
-
-      {selectedPatient && (
-        <section className="app-section">
-          <h2 className="section-title">
-            Patient history and reports - {selectedPatientFullName}
-          </h2>
-
-          <PatientHistory patient={selectedPatient} />
-
-          <AttachReports
-            patientId={selectedPatient.idNumber}
-            existingReports={selectedPatient.reports || []}
-            onAddReport={handleAddReport}
-          />
-        </section>
-      )}
     </div>
   );
 }
 
 export default PatientDataPage;
-

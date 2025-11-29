@@ -14,7 +14,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const audioChunksRef = useRef([]);
   const recognitionRef = useRef(null);
 
-  // Initialize speech recognition (once)
+  // Initialize speech recognition
   useEffect(() => {
     if (typeof window === "undefined") {
       setSpeechSupported(false);
@@ -72,23 +72,13 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
     };
   }, []);
 
-  // Load last transcription for selected patient
-  // שינוי חשוב: התלות היא רק על idNumber, לא על כל האובייקט
+  // When switching patient, start with an empty transcription box
   useEffect(() => {
-    if (!selectedPatient || !Array.isArray(selectedPatient.history)) {
+    if (!selectedPatient) {
       setTranscription("");
       return;
     }
-
-    const lastTranscription = [...selectedPatient.history]
-      .reverse()
-      .find((entry) => entry.type === "Transcription");
-
-    if (lastTranscription && lastTranscription.summary) {
-      setTranscription(lastTranscription.summary);
-    } else {
-      setTranscription("");
-    }
+    setTranscription("");
   }, [selectedPatient?.idNumber]);
 
   // Audio recording handlers
@@ -150,7 +140,6 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
 
     try {
       recognitionRef.current.lang = language;
-      // Do not reset transcription here - we want to continue from existing text
       recognitionRef.current.start();
       setIsDictating(true);
     } catch (error) {
@@ -171,22 +160,22 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
 
   // Save transcription to patient history
   const handleSaveClick = () => {
-    if (
-      !selectedPatient ||
-      !onSaveTranscription ||
-      !transcription ||
-      !transcription.trim()
-    ) {
+    if (!selectedPatient || typeof onSaveTranscription !== "function") {
       return;
     }
 
-    const clean = transcription.trim();
+    const clean = (transcription || "").trim();
+    if (!clean) {
+      return;
+    }
 
-    // שולחים להוק את ה־idNumber והטקסט
     onSaveTranscription(selectedPatient.idNumber, clean);
 
-    // אחרי שמירה - מנקים את הטקסט כדי שהשדה יהיה ריק
+    // Reset UI after save
     setTranscription("");
+    setIsRecordingAudio(false);
+    setIsDictating(false);
+    setAudioURL("");
   };
 
   // Cleanup on unmount

@@ -99,13 +99,11 @@ function App() {
 
         <main className="app-main">
           <Routes>
-            {/* redirect root to dashboard */}
             <Route
               path="/"
               element={<Navigate to="/dashboard" replace />}
             />
 
-            {/* Dashboard */}
             <Route
               path="/dashboard"
               element={
@@ -116,7 +114,6 @@ function App() {
               }
             />
 
-            {/* Create or edit patient profile */}
             <Route
               path="/patients"
               element={
@@ -127,7 +124,6 @@ function App() {
               }
             />
 
-            {/* Full patient file by ID */}
             <Route
               path="/patients/:idNumber"
               element={
@@ -143,11 +139,12 @@ function App() {
                     patientsState.handleSaveTranscription
                   }
                   handleEditPatient={patientsState.handleEditPatient}
+                  onUpdatePatient={patientsState.handleUpdatePatientInline}
+                  handleImportPatient={undefined}
                 />
               }
             />
 
-            {/* Patient data - list, search, export or import */}
             <Route
               path="/data/patient"
               element={
@@ -158,7 +155,6 @@ function App() {
               }
             />
 
-            {/* Other placeholder pages */}
             <Route
               path="/users"
               element={
