@@ -6,118 +6,6 @@ import AttachReports from "../components/AttachReports";
 import RecordAudio from "../components/RecordAudio";
 import "./PatientDetailsPage.css";
 
-function buildFhirBundleForPatient(patient) {
-  const patientId = patient.idNumber || "";
-
-  const patientResource = {
-    resourceType: "Patient",
-    id: patientId,
-    identifier: patientId
-      ? [
-          {
-            system: "local-id-number",
-            value: patientId,
-          },
-        ]
-      : [],
-    name: [
-      {
-        given: patient.firstName ? [patient.firstName] : [],
-        family: patient.lastName || "",
-      },
-    ],
-    gender: patient.gender || undefined,
-    birthDate: patient.dateOfBirth || undefined,
-    telecom: [
-      patient.phone ? { system: "phone", value: patient.phone } : null,
-      patient.email ? { system: "email", value: patient.email } : null,
-    ].filter(Boolean),
-    address: [
-      {
-        line: patient.address ? [patient.address] : undefined,
-        city: patient.city || undefined,
-        country: patient.country || undefined,
-      },
-    ],
-    extension: [
-      patient.clinicalStatus
-        ? {
-            url: "http://example.org/fhir/StructureDefinition/clinical-status",
-            valueString: patient.clinicalStatus,
-          }
-        : null,
-      patient.medicalIssues
-        ? {
-            url: "http://example.org/fhir/StructureDefinition/medical-issues",
-            valueString: patient.medicalIssues,
-          }
-        : null,
-      patient.notes
-        ? {
-            url: "http://example.org/fhir/StructureDefinition/notes",
-            valueString: patient.notes,
-          }
-        : null,
-    ].filter(Boolean),
-  };
-
-  const entries = [{ resource: patientResource }];
-
-  if (Array.isArray(patient.history)) {
-    patient.history.forEach((item, index) => {
-      entries.push({
-        resource: {
-          resourceType: "Observation",
-          id: `${patientId || "patient"}-history-${index + 1}`,
-          status: "final",
-          subject: { reference: `Patient/${patientId}` },
-          effectiveDateTime: item.date || undefined,
-          valueString:
-            item.text || item.transcription || JSON.stringify(item),
-        },
-      });
-    });
-  }
-
-  if (Array.isArray(patient.reports)) {
-    patient.reports.forEach((report, index) => {
-      entries.push({
-        resource: {
-          resourceType: "DiagnosticReport",
-          id: `${patientId || "patient"}-report-${index + 1}`,
-          status: "final",
-          subject: { reference: `Patient/${patientId}` },
-          effectiveDateTime: report.date || undefined,
-          code: report.type ? { text: report.type } : undefined,
-          conclusion:
-            report.description || report.name || JSON.stringify(report),
-        },
-      });
-    });
-  }
-
-  return {
-    resourceType: "Bundle",
-    type: "collection",
-    entry: entries,
-  };
-}
-
-function downloadJson(data, filename) {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
-}
-
 function InlineEditable({
   value,
   placeholder = "-",
@@ -205,7 +93,8 @@ function PatientDetailsPage({
   handleSaveTranscription,
   handleEditPatient,
   onUpdatePatient,
-  handleImportPatient,
+  handleExportPatients,
+  handleImportPatients,
 }) {
   const { idNumber } = useParams();
   const navigate = useNavigate();
@@ -265,10 +154,18 @@ function PatientDetailsPage({
     navigate("/data/patient");
   };
 
-  const handleSaveTranscriptionForPatient = (id, text) => {
-    if (!id || !text || !text.trim()) return;
-    handleSelectPatient(id);
-    handleSaveTranscription(id, text);
+  // תמלול - עכשיו תומך גם ב audioUrl אם RecordAudio מעבירה אותו
+  const handleSaveTranscriptionForPatient = (id, text, audioUrl) => {
+    const targetId = id || editablePatient.idNumber;
+    const cleanText = text?.trim() || "";
+    const hasAudio = Boolean(audioUrl);
+
+    if (!targetId) return;
+    if (!cleanText && !hasAudio) return;
+
+    handleSelectPatient(targetId);
+    // ב usePatients עדכנו את handleSaveTranscription לקבל גם audioUrl
+    handleSaveTranscription(targetId, cleanText, audioUrl);
   };
 
   const handleAddReportForPatient = (meta) => {
@@ -276,26 +173,26 @@ function PatientDetailsPage({
     handleAddReport(editablePatient.idNumber, meta);
   };
 
-  const handleExportPatient = () => {
-    const bundle = buildFhirBundleForPatient(editablePatient);
-    const safeName = fullName || editablePatient.idNumber || "patient";
-    const fileName = `patient-${String(safeName)
-      .replace(/\s+/g, "_")
-      .toLowerCase()}.fhir.json`;
-    downloadJson(bundle, fileName);
+  const handleExportClick = () => {
+    if (typeof handleExportPatients === "function") {
+      // כרגע הפונקציה מייצאת את כל המטופלים כמקשה אחת
+      // זה מערב את המטופל הזה עם כל השאר, אבל משתמשת באותה לוגיקה של usePatients
+      handleExportPatients();
+    } else {
+      alert("Export is not configured yet in the app.");
+    }
   };
 
-  const handleImportForPatient = (event) => {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-
-    if (typeof handleImportPatient === "function") {
-      handleImportPatient(editablePatient.idNumber, file);
+  const handleImportChange = (event) => {
+    if (typeof handleImportPatients === "function") {
+      handleImportPatients(event);
     } else {
-      alert("Import for this patient is not configured yet in the app.");
+      alert("Import is not configured yet in the app.");
     }
-
-    event.target.value = "";
+    // איפוס כדי שאפשר יהיה לבחור שוב את אותו קובץ אם צריך
+    if (event?.target) {
+      event.target.value = "";
+    }
   };
 
   return (
@@ -342,7 +239,7 @@ function PatientDetailsPage({
           <button
             type="button"
             className="primary-button outline export-single-button"
-            onClick={handleExportPatient}
+            onClick={handleExportClick}
           >
             Export patient (FHIR JSON)
           </button>
@@ -353,7 +250,7 @@ function PatientDetailsPage({
               type="file"
               accept="application/json"
               className="import-single-input"
-              onChange={handleImportForPatient}
+              onChange={handleImportChange}
             />
           </label>
         </div>

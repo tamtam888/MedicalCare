@@ -5,8 +5,11 @@ import "./RecordAudio.css";
 function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
+
   const [audioURL, setAudioURL] = useState("");
+  const [audioData, setAudioData] = useState(""); // data URL for saving
   const [transcription, setTranscription] = useState("");
+
   const [speechSupported, setSpeechSupported] = useState(true);
   const [language, setLanguage] = useState("en-US");
 
@@ -14,7 +17,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const audioChunksRef = useRef([]);
   const recognitionRef = useRef(null);
 
-  // Initialize speech recognition
+  // Initialize speech recognition (dictation)
   useEffect(() => {
     if (typeof window === "undefined") {
       setSpeechSupported(false);
@@ -25,7 +28,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.warn("Speech recognition is not supported in this browser.");
+      console.warn("Speech recognition is not supported.");
       setSpeechSupported(false);
       return;
     }
@@ -36,7 +39,6 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
 
     recognition.onresult = (event) => {
       let newText = "";
-
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
         if (result[0] && result[0].transcript) {
@@ -53,38 +55,31 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
       }
     };
 
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
+    recognition.onerror = (err) => {
+      console.error("Speech recognition error:", err);
     };
 
     recognitionRef.current = recognition;
     setSpeechSupported(true);
 
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (error) {
-          console.error("Failed to stop speech recognition on cleanup:", error);
-        }
-        recognitionRef.current = null;
-      }
+      try {
+        recognitionRef.current?.stop();
+      } catch {}
     };
   }, []);
 
-  // When switching patient, start with an empty transcription box
+  // When switching patient, reset transcription
   useEffect(() => {
-    if (!selectedPatient) {
-      setTranscription("");
-      return;
-    }
     setTranscription("");
+    setAudioURL("");
+    setAudioData("");
   }, [selectedPatient?.idNumber]);
 
-  // Audio recording handlers
+  // Audio recording start
   const handleStartAudio = async () => {
     if (!selectedPatient) {
-      console.warn("No patient selected for recording.");
+      console.warn("No patient selected.");
       return;
     }
 
@@ -102,101 +97,85 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/mp3",
         });
-        const url = URL.createObjectURL(audioBlob);
-        setAudioURL(url);
+
+        // URL for playback
+        const localURL = URL.createObjectURL(audioBlob);
+        setAudioURL(localURL);
+
+        // Convert to base64 for saving in usePatients
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result; // data URL
+          if (result) {
+            setAudioData(result);
+          }
+        };
+        reader.readAsDataURL(audioBlob);
       };
 
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecordingAudio(true);
     } catch (error) {
-      console.error("Error accessing microphone for audio:", error);
+      console.error("Error accessing microphone:", error);
     }
   };
 
+  // Audio recording stop
   const handleStopAudio = () => {
-    if (mediaRecorderRef.current) {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (error) {
-        console.error("Failed to stop media recorder:", error);
-      }
-      mediaRecorderRef.current = null;
-    }
+    try {
+      mediaRecorderRef.current?.stop();
+    } catch {}
+    mediaRecorderRef.current = null;
     setIsRecordingAudio(false);
   };
 
-  // Dictation handlers (speech-to-text)
+  // Start dictation
   const handleStartDictation = () => {
-    if (!selectedPatient) {
-      console.warn("No patient selected for dictation.");
-      return;
-    }
-
-    if (!speechSupported || !recognitionRef.current) {
-      console.warn("Speech recognition not supported.");
-      return;
-    }
+    if (!selectedPatient) return;
+    if (!speechSupported) return;
 
     try {
       recognitionRef.current.lang = language;
       recognitionRef.current.start();
       setIsDictating(true);
     } catch (error) {
-      console.error("Failed to start speech recognition:", error);
+      console.error("Failed to start dictation:", error);
     }
   };
 
+  // Stop dictation
   const handleStopDictation = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (error) {
-        console.error("Failed to stop speech recognition:", error);
-      }
-    }
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
     setIsDictating(false);
   };
 
-  // Save transcription to patient history
+  // Save transcription + audio
   const handleSaveClick = () => {
     if (!selectedPatient || typeof onSaveTranscription !== "function") {
       return;
     }
 
-    const clean = (transcription || "").trim();
-    if (!clean) {
-      return;
-    }
+    const cleanText = (transcription || "").trim();
+    const hasAudio = Boolean(audioData);
 
-    onSaveTranscription(selectedPatient.idNumber, clean);
+    if (!cleanText && !hasAudio) return;
 
-    // Reset UI after save
+    onSaveTranscription(
+      selectedPatient.idNumber,
+      cleanText,
+      audioData // send audio to usePatients
+    );
+
+    // Reset UI
     setTranscription("");
+    setAudioURL("");
+    setAudioData("");
     setIsRecordingAudio(false);
     setIsDictating(false);
-    setAudioURL("");
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (error) {
-          console.error("Failed to stop speech recognition on cleanup:", error);
-        }
-      }
-      if (mediaRecorderRef.current) {
-        try {
-          mediaRecorderRef.current.stop();
-        } catch (error) {
-          console.error("Failed to stop media recorder on cleanup:", error);
-        }
-      }
-    };
-  }, []);
 
   const fullName =
     selectedPatient
@@ -215,7 +194,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
         </p>
       ) : (
         <p className="recording-patient-label">
-          Select a patient from the list to record a treatment.
+          Select a patient to begin recording or dictation.
         </p>
       )}
 
@@ -236,8 +215,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
 
       {!speechSupported && (
         <p className="recording-warning">
-          Speech-to-text is not supported in this browser. Audio will be
-          recorded without live transcription.
+          Speech-to-text not supported in this browser.
         </p>
       )}
 
@@ -276,7 +254,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
       <div className="live-transcription-box">
         <h4>
           {isDictating
-            ? "Live transcription (you can edit):"
+            ? "Live transcription (editable):"
             : "Transcription (editable):"}
         </h4>
         <textarea
@@ -288,7 +266,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
         <button
           className="btn-save-transcription"
           onClick={handleSaveClick}
-          disabled={!selectedPatient || !transcription.trim()}
+          disabled={!selectedPatient}
         >
           Save transcription
         </button>
