@@ -1,18 +1,24 @@
 /* src/pages/PatientDataPage.css */
 
-/* Wrapper for this page */
+/* page wrapper */
+
 .patient-data-page {
   max-width: 960px;
   margin: 0 auto;
+  padding: 1.25rem 0;
 }
 
-/* Header */
+/* header */
+
 .patient-data-header {
   margin-bottom: 1.5rem;
 }
 
 .patient-data-title {
-  margin-bottom: 0.25rem;
+  margin: 0 0 0.25rem 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
 }
 
 .patient-data-subtitle {
@@ -21,30 +27,91 @@
   color: #6b7280;
 }
 
-/* Sections */
+/* sections */
+
 .patient-data-section {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.9rem;
 }
 
-/* Search section */
-.patient-search-form {
+/* search section */
+
+.patient-search-section {
+  margin-top: 0.75rem;
+}
+
+.patient-search-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.35rem;
+}
+
+.patient-search-form,
+.patient-search-wrapper {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
-  margin-top: 0.75rem;
 }
 
-.patient-search-input {
-  flex: 1 1 200px;
+/* rounded input with icon */
+
+.patient-search-input-container {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: #ffffff;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #e5e7eb;
+  flex: 1 1 220px;
+  max-width: 360px;
   min-width: 0;
 }
 
-.patient-search-button {
-  flex: 0 0 auto;
+.patient-search-icon {
+  font-size: 0.9rem;
+  color: #9ca3af;
 }
 
-/* Patient list header */
+.patient-search-input {
+  border: none;
+  outline: none;
+  font-size: 0.88rem;
+  width: 100%;
+  background: transparent;
+  color: #111827;
+}
+
+/* search button */
+
+.patient-search-button {
+  flex: 0 0 auto;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.9rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #ffffff;
+  font-weight: 500;
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.25);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.15s ease;
+}
+
+.patient-search-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+  opacity: 0.96;
+}
+
+.patient-search-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+}
+
+/* patient list header */
+
 .patient-data-section-header {
   display: flex;
   align-items: baseline;
@@ -58,12 +125,15 @@
   color: #6b7280;
 }
 
-/* Export and import */
+/* export and import helper text */
+
 .patient-data-helper-text {
   margin: 0 0 0.75rem;
   font-size: 0.9rem;
   color: #6b7280;
 }
+
+/* export and import controls */
 
 .export-import-controls {
   display: flex;
@@ -72,36 +142,69 @@
   align-items: center;
 }
 
-/* Export button */
+/* export button */
+
 .export-button {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.15s ease;
 }
 
-/* Import label and input */
+.export-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 20px rgba(99, 102, 241, 0.4);
+  opacity: 0.96;
+}
+
+.export-icon {
+  font-size: 1rem;
+}
+
+/* import label and input */
+
 .import-label {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.9rem;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
   border-radius: 999px;
-  background-color: #f3f4f6;
-  color: #111827;
-  font-size: 0.9rem;
+  background-color: #f5f3ff;
+  color: #4338ca;
+  font-size: 0.88rem;
   cursor: pointer;
   border: 1px solid #e5e7eb;
+  transition: background-color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
 }
 
 .import-label:hover {
-  background-color: #e5e7eb;
+  background-color: #eef2ff;
+  border-color: #a855f7;
+  box-shadow: 0 4px 10px rgba(129, 140, 248, 0.25);
 }
 
 .import-label-text {
   white-space: nowrap;
 }
 
-/* Hide the real file input */
+.import-icon {
+  font-size: 1rem;
+}
+
+/* hide real file input */
+
 .import-input {
   position: absolute;
   inset: 0;
@@ -109,15 +212,23 @@
   cursor: pointer;
 }
 
-/* Responsive tweaks */
+/* responsive tweaks */
+
 @media (max-width: 640px) {
-  .patient-search-form {
+  .patient-search-form,
+  .patient-search-wrapper {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .patient-search-input-container {
+    max-width: 100%;
+  }
+
   .patient-search-button {
     width: 100%;
+    text-align: center;
+    justify-content: center;
   }
 
   .export-import-controls {
@@ -127,10 +238,24 @@
 
   .export-button {
     width: 100%;
+    justify-content: center;
   }
 
   .import-label {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* RTL support */
+[dir="rtl"] .patient-data-page {
+  text-align: right;
+}
+
+[dir="rtl"] .patient-search-form {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .export-import-controls {
+  flex-direction: row-reverse;
 }

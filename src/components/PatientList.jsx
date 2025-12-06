@@ -1,5 +1,4 @@
 // src/components/PatientList.jsx
-import React from "react";
 import "./PatientList.css";
 
 function PatientList({

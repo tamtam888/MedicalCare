@@ -1,38 +1,42 @@
-/* כרטיס טופס בסיסי */
 .patient-form {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
   background-color: #ffffff;
-  padding: 1rem 0;
+  padding: 1.25rem 0;
 }
 
-/* הודעת שגיאה בראש הטופס */
+/* top error message */
+
 .form-error {
-  background-color: #ffe5e5;
-  border: 1px solid #ffb2b2;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: 10px;
   color: #b91c1c;
   font-weight: 600;
   margin-bottom: 0.5rem;
+  font-size: 0.9rem;
 }
 
-/* עטיפת כל שדה */
+/* field wrapper */
+
 .form-field {
   display: flex;
   flex-direction: column;
 }
 
-/* תוויות */
+/* labels */
+
 .form-field label {
   font-weight: 600;
   margin-bottom: 0.25rem;
-  font-size: 0.95rem;
-  color: #333;
+  font-size: 0.93rem;
+  color: #111827;
 }
 
-/* כוכבית חובה */
+/* required asterisk */
+
 .required-asterisk {
   color: #dc2626;
   font-weight: bold;
@@ -41,85 +45,144 @@
   vertical-align: middle;
 }
 
-/* שדות קלט */
+/* inputs, selects, textareas */
+
 .form-field input,
 .form-field select,
 .form-field textarea {
   width: 100%;
-  padding: 0.55rem 0.75rem;
+  padding: 0.55rem 0.8rem;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
   box-sizing: border-box;
-  background-color: #fcfcfc;
-  color: #111;
+  background-color: #f9fafb;
+  color: #111827;
+  transition: border-color 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
 }
 
-/* פוקוס */
+/* focus state */
+
 .form-field input:focus,
 .form-field select:focus,
 .form-field textarea:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  border-color: #a855f7;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+  background-color: #ffffff;
 }
 
-/* שדות רחבים */
+/* full width helper */
+
 .form-full-width {
   width: 100%;
 }
 
-/* טקסטאראה */
+/* textarea */
+
 .form-field textarea {
   min-height: 90px;
   resize: vertical;
 }
 
-/* אזור כפתורים */
+/* actions area */
+
 .form-actions {
   display: flex;
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
 
-/* כפתור Cancel */
+/* cancel button */
+
 .form-cancel-btn {
-  background-color: #e5e7eb;
+  background-color: #f3f4f6;
   color: #111827;
-  border: none;
-  padding: 0.45rem 0.9rem;
-  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.1s ease, border-color 0.1s ease, transform 0.05s ease;
 }
 
-/* כפתור Create/Update בולט יותר */
+.form-cancel-btn:hover {
+  background-color: #e5e7eb;
+  border-color: #d4d4d8;
+  transform: translateY(-1px);
+}
+
+/* primary submit button */
+
 .form-submit-btn {
-  background-color: #2563eb;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
   color: #ffffff;
   border: none;
   padding: 0.55rem 1.3rem;
-  border-radius: 6px;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
-  transition: transform 0.05s ease, box-shadow 0.05s ease, filter 0.1s ease;
+  box-shadow: 0 6px 14px rgba(99, 102, 241, 0.35);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.1s ease;
 }
 
-/* hover וקליק */
 .form-submit-btn:hover {
-  filter: brightness(1.05);
+  opacity: 0.97;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.4);
 }
 
 .form-submit-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.4);
 }
 
-/* רספונסיביות */
+/* form row for side-by-side fields */
+.form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-field {
+  flex: 1 1 0;
+  min-width: 200px;
+}
+
+/* responsiveness */
 @media (max-width: 600px) {
   .patient-form {
-    padding: 0;
+    padding: 0.75rem 0;
   }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row .form-field {
+    min-width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-submit-btn,
+  .form-cancel-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* RTL support */
+[dir="rtl"] .form-field label {
+  text-align: right;
+}
+
+[dir="rtl"] .form-actions {
+  flex-direction: row-reverse;
 }

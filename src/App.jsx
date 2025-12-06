@@ -9,6 +9,7 @@ import PatientDetailsPage from "./pages/PatientDetailsPage";
 import { translations } from "./i18n/translations";
 import { medplum } from "./medplumClient";
 import Sidebar from "./components/Sidebar";
+import { Globe2 } from "lucide-react";
 import "./App.css";
 
 function SimplePage({ title, text }) {
@@ -43,16 +44,29 @@ function App() {
 
         if (code) {
           await medplum.processCode(code);
-
           const cleanUrl =
             window.location.origin + window.location.pathname;
           window.history.replaceState({}, "", cleanUrl);
         }
 
-        const profile = medplum.getProfile();
-        setMedplumProfile(profile || null);
+        const isAuthenticated = medplum.isAuthenticated();
+        if (isAuthenticated) {
+          try {
+            const profile = medplum.getProfile();
+            setMedplumProfile(profile || null);
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.warn("Failed to get Medplum profile:", error);
+            }
+            setMedplumProfile(null);
+          }
+        } else {
+          setMedplumProfile(null);
+        }
       } catch (error) {
-        console.error("Medplum authentication failed:", error);
+        if (import.meta.env.DEV) {
+          console.error("Medplum authentication failed:", error);
+        }
         setMedplumProfile(null);
       } finally {
         setAuthReady(true);
@@ -62,11 +76,24 @@ function App() {
     initAuth();
   }, []);
 
-  const handleConnectMedplum = () => {
+  const handleConnectMedplum = async () => {
     try {
-      medplum.signInWithRedirect();
+      if (medplum.isAuthenticated()) {
+        const confirmDisconnect = window.confirm(
+          "Are you sure you want to disconnect from Medplum?"
+        );
+        if (confirmDisconnect) {
+          await medplum.signOut();
+          setMedplumProfile(null);
+        }
+      } else {
+        medplum.signInWithRedirect();
+      }
     } catch (error) {
-      console.error("Failed to redirect to Medplum:", error);
+      if (import.meta.env.DEV) {
+        console.error("Failed to connect/disconnect Medplum:", error);
+      }
+      alert("Failed to connect to Medplum. Please try again.");
     }
   };
 
@@ -75,26 +102,39 @@ function App() {
   }
 
   return (
-    <div className={`app-shell ${isHebrew ? "shell-rtl" : "shell-ltr"}`}>
+    <div className={"app-shell" + (isHebrew ? " app-shell-rtl" : "")}>
       <Sidebar language={language} />
 
       <div className="app-main-area" dir={isHebrew ? "rtl" : "ltr"}>
-        <header className="app-topbar">
-          <button
-            type="button"
-            className="lang-toggle-button"
-            onClick={handleToggleLanguage}
-          >
-            🌐 {t.langButton}
-          </button>
+        <header className="app-header">
+          <div className="app-header-right">
+            <button
+              type="button"
+              className="primary-button medplum-header-button"
+              onClick={handleConnectMedplum}
+            >
+              {medplumProfile
+                ? "Medplum: Connected"
+                : "Connect to Medplum"}
+            </button>
 
-          <button
-            type="button"
-            className="medplum-connect-button"
-            onClick={handleConnectMedplum}
-          >
-            {medplumProfile ? "Medplum: Connected" : "Connect to Medplum"}
-          </button>
+            <button
+              type="button"
+              className="lang-switch"
+              dir="ltr"
+              onClick={handleToggleLanguage}
+              title="Change language"
+            >
+              <span className="lang-switch-part">ILS</span>
+              <span className="lang-switch-separator">|</span>
+              <span className="lang-switch-part">
+                {isHebrew ? "HE" : "EN"}
+              </span>
+              <span className="lang-switch-separator">|</span>
+              <span className="lang-switch-part">IL</span>
+              <Globe2 size={16} className="lang-switch-icon" />
+            </button>
+          </div>
         </header>
 
         <main className="app-main">
@@ -107,10 +147,7 @@ function App() {
             <Route
               path="/dashboard"
               element={
-                <DashboardPage
-                  patients={patients}
-                  language={language}
-                />
+                <DashboardPage patients={patients} language={language} />
               }
             />
 
@@ -135,11 +172,14 @@ function App() {
                   }
                   handleSelectPatient={patientsState.handleSelectPatient}
                   handleAddReport={patientsState.handleAddReport}
+                  handleDeleteReport={patientsState.handleDeleteReport}
                   handleSaveTranscription={
                     patientsState.handleSaveTranscription
                   }
                   handleEditPatient={patientsState.handleEditPatient}
-                  onUpdatePatient={patientsState.handleUpdatePatientInline}
+                  onUpdatePatient={
+                    patientsState.handleUpdatePatientInline
+                  }
                   handleExportPatients={
                     patientsState.handleExportPatients
                   }

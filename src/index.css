@@ -1,5 +1,5 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -12,6 +12,7 @@ a {
   font-weight: 500;
   color: #2563eb;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 a:hover {
@@ -22,6 +23,18 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: #f1f5f9;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+/* Loading state */
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 1.1rem;
+  color: #6b7280;
+  font-weight: 500;
 }

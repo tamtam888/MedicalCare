@@ -21,6 +21,7 @@ function InlineEditable({
     if (!editing) {
       setDraft(value || "");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, editing]);
 
   const handleClick = () => {
@@ -86,12 +87,11 @@ function InlineEditable({
 
 function PatientDetailsPage({
   patients,
-  selectedPatient,
   selectedPatientFullName,
   handleSelectPatient,
   handleAddReport,
+  handleDeleteReport,
   handleSaveTranscription,
-  handleEditPatient,
   onUpdatePatient,
   handleExportPatients,
   handleImportPatients,
@@ -99,23 +99,62 @@ function PatientDetailsPage({
   const { idNumber } = useParams();
   const navigate = useNavigate();
 
-  const patient = useMemo(
-    () =>
-      patients.find(
-        (p) =>
-          p.idNumber &&
-          p.idNumber.toString().trim() === String(idNumber).trim()
-      ) || null,
-    [patients, idNumber]
-  );
+  const patient = useMemo(() => {
+    if (!idNumber || !patients) return null;
+    const trimmedId = String(idNumber).trim();
+    if (!trimmedId) return null;
+    
+    const found = patients.find(
+      (p) => p && p.idNumber && String(p.idNumber).trim() === trimmedId
+    );
+    
+    if (import.meta.env.DEV && !found && patients.length > 0) {
+      console.warn(
+        `[PatientDetailsPage] Patient not found: ${trimmedId}. Available IDs:`,
+        patients.map((p) => p?.idNumber).filter(Boolean)
+      );
+    }
+    
+    return found || null;
+  }, [patients, idNumber]);
 
-  const [editablePatient, setEditablePatient] = useState(patient || null);
+  const [editablePatient, setEditablePatient] = useState(null);
 
   useEffect(() => {
-    setEditablePatient(patient || null);
-  }, [patient]);
+    if (patient) {
+      // Use setTimeout to avoid synchronous setState in effect
+      const timer = setTimeout(() => {
+        setEditablePatient(patient);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+    
+    // If patient is not found but we have patients, wait a bit for state to update
+    if (patients && patients.length > 0) {
+      const timer = setTimeout(() => {
+        const trimmedId = String(idNumber).trim();
+        const found = patients.find(
+          (p) => p && p.idNumber && String(p.idNumber).trim() === trimmedId
+        );
+        if (found) {
+          setEditablePatient(found);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [patient, patients, idNumber]);
 
-  if (!patient || !editablePatient) {
+  // Show loading state if patients array exists but patient not found yet
+  if (patients && patients.length > 0 && !patient && !editablePatient) {
+    return (
+      <div className="app-container patient-details-page">
+        <h1 className="app-title">Patient profile</h1>
+        <p>Loading patient data...</p>
+      </div>
+    );
+  }
+
+  if (!patient && !editablePatient) {
     return (
       <div className="app-container patient-details-page">
         <h1 className="app-title">Patient profile</h1>
@@ -131,9 +170,12 @@ function PatientDetailsPage({
     );
   }
 
+  // Use editablePatient as the source of truth
+  const currentPatient = editablePatient || patient;
+
   const fullName =
     selectedPatientFullName ||
-    [editablePatient.firstName, editablePatient.lastName]
+    [currentPatient.firstName, currentPatient.lastName]
       .filter(Boolean)
       .join(" ");
 
@@ -154,9 +196,8 @@ function PatientDetailsPage({
     navigate("/data/patient");
   };
 
-  // תמלול - עכשיו תומך גם ב audioUrl אם RecordAudio מעבירה אותו
   const handleSaveTranscriptionForPatient = (id, text, audioUrl) => {
-    const targetId = id || editablePatient.idNumber;
+    const targetId = id || currentPatient.idNumber;
     const cleanText = text?.trim() || "";
     const hasAudio = Boolean(audioUrl);
 
@@ -164,19 +205,22 @@ function PatientDetailsPage({
     if (!cleanText && !hasAudio) return;
 
     handleSelectPatient(targetId);
-    // ב usePatients עדכנו את handleSaveTranscription לקבל גם audioUrl
     handleSaveTranscription(targetId, cleanText, audioUrl);
   };
 
   const handleAddReportForPatient = (meta) => {
-    handleSelectPatient(editablePatient.idNumber);
-    handleAddReport(editablePatient.idNumber, meta);
+    handleSelectPatient(currentPatient.idNumber);
+    handleAddReport(currentPatient.idNumber, meta);
+  };
+
+  const handleDeleteReportForPatient = (reportId) => {
+    if (typeof handleDeleteReport === "function") {
+      handleDeleteReport(currentPatient.idNumber, reportId);
+    }
   };
 
   const handleExportClick = () => {
     if (typeof handleExportPatients === "function") {
-      // כרגע הפונקציה מייצאת את כל המטופלים כמקשה אחת
-      // זה מערב את המטופל הזה עם כל השאר, אבל משתמשת באותה לוגיקה של usePatients
       handleExportPatients();
     } else {
       alert("Export is not configured yet in the app.");
@@ -189,7 +233,7 @@ function PatientDetailsPage({
     } else {
       alert("Import is not configured yet in the app.");
     }
-    // איפוס כדי שאפשר יהיה לבחור שוב את אותו קובץ אם צריך
+
     if (event?.target) {
       event.target.value = "";
     }
@@ -200,22 +244,22 @@ function PatientDetailsPage({
       <header className="patient-details-header">
         <div className="patient-details-title-block">
           <h1 className="app-title patient-details-title">
-            Patient profile - {fullName || "Unknown"}
+            {fullName || "Unknown"}
           </h1>
 
           <div className="patient-details-meta">
             <span className="meta-item">
-              <strong>ID number:</strong> {editablePatient.idNumber || "-"}
+              <strong>ID number:</strong> {currentPatient.idNumber || "-"}
             </span>
             <span className="meta-item">
               <strong>Date of birth:</strong>{" "}
-              {editablePatient.dateOfBirth || "-"}
+              {currentPatient.dateOfBirth || "-"}
             </span>
             <span className="meta-item">
               <strong>Gender:</strong>{" "}
               <select
                 className="inline-select"
-                value={editablePatient.gender || ""}
+                value={currentPatient.gender || ""}
                 onChange={(e) => updateField("gender", e.target.value)}
               >
                 <option value="">Not set</option>
@@ -261,9 +305,9 @@ function PatientDetailsPage({
 
         <div className="patient-details-grid">
           <div className="details-row">
-            <span className="details-label">Phone</span>
+            <strong className="details-label">Phone</strong>
             <InlineEditable
-              value={editablePatient.phone}
+              value={currentPatient.phone}
               placeholder="Add phone number"
               inputType="tel"
               onChange={(val) => updateField("phone", val)}
@@ -272,9 +316,9 @@ function PatientDetailsPage({
           </div>
 
           <div className="details-row">
-            <span className="details-label">Email</span>
+            <strong className="details-label">Email</strong>
             <InlineEditable
-              value={editablePatient.email}
+              value={currentPatient.email}
               placeholder="📧 Add email"
               onChange={(val) => updateField("email", val)}
               className="details-value"
@@ -282,9 +326,9 @@ function PatientDetailsPage({
           </div>
 
           <div className="details-row">
-            <span className="details-label">Address</span>
+            <strong className="details-label">Address</strong>
             <InlineEditable
-              value={editablePatient.address}
+              value={currentPatient.address}
               placeholder="Street and number, city and country"
               onChange={(val) => updateField("address", val)}
               className="details-value"
@@ -293,10 +337,10 @@ function PatientDetailsPage({
         </div>
 
         <div className="status-row">
-          <span className="details-label">Clinical status</span>
+          <strong className="details-label">Clinical status</strong>
           <select
             className="inline-input details-value"
-            value={editablePatient.clinicalStatus || ""}
+            value={currentPatient.clinicalStatus || ""}
             onChange={(e) =>
               updateField("clinicalStatus", e.target.value)
             }
@@ -310,9 +354,9 @@ function PatientDetailsPage({
         </div>
 
         <div className="section-with-field">
-          <h3 className="section-subtitle">Medical issues</h3>
+          <strong className="section-subtitle">Medical issues</strong>
           <InlineEditable
-            value={editablePatient.medicalIssues}
+            value={currentPatient.medicalIssues}
             placeholder="Chronic conditions, injuries, risk factors, operations"
             onChange={(val) => updateField("medicalIssues", val)}
             multiline
@@ -321,9 +365,9 @@ function PatientDetailsPage({
         </div>
 
         <div className="section-with-field">
-          <h3 className="section-subtitle">Notes</h3>
+          <strong className="section-subtitle">Notes</strong>
           <InlineEditable
-            value={editablePatient.notes}
+            value={currentPatient.notes}
             placeholder="📝 Write your notes here..."
             onChange={(val) => updateField("notes", val)}
             multiline
@@ -335,18 +379,19 @@ function PatientDetailsPage({
       <section className="patient-card">
         <h2 className="section-title">Treatment transcription</h2>
         <RecordAudio
-          selectedPatient={editablePatient}
+          selectedPatient={currentPatient}
           onSaveTranscription={handleSaveTranscriptionForPatient}
         />
       </section>
 
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
-        <PatientHistory patient={editablePatient} />
+        <PatientHistory patient={currentPatient} />
         <AttachReports
-          patientId={editablePatient.idNumber}
-          existingReports={editablePatient.reports || []}
+          patientId={currentPatient.idNumber}
+          existingReports={currentPatient.reports || []}
           onAddReport={handleAddReportForPatient}
+          onDeleteReport={handleDeleteReportForPatient}
         />
       </section>
     </div>

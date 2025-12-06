@@ -6,13 +6,7 @@ import "./PatientDataPage.css";
 
 function PatientDataPage({
   patients,
-  selectedPatient,
-  selectedPatientFullName,
-  handleSelectPatient,
-  handleEditPatient,
   handleDeletePatient,
-  handleAddReport,
-  handleSaveTranscription,
   handleExportPatients,
   handleImportPatients,
 }) {

@@ -4,49 +4,151 @@
   margin: 0;
 }
 
+/* patient card */
+
 .patient-list-item {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 0.6rem 0.9rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
-  background-color: #fafafa;
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  background:
+    linear-gradient(#ffffff, #ffffff),
+    linear-gradient(135deg, #a855f7, #6366f1);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 1px solid transparent;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  transition: transform 0.08s ease, box-shadow 0.1s ease;
 }
+
+.patient-list-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.18);
+}
+
+/* left section */
 
 .patient-list-left {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .patient-list-main {
   display: flex;
   flex-direction: column;
+  line-height: 1.3;
 }
+
+/* name */
 
 .patient-list-name {
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.02rem;
+  color: #111827;
 }
+
+/* ID */
 
 .patient-list-id {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: #6b7280;
+  margin-top: -2px;
 }
 
+/* extra details */
+
 .patient-list-extra {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: #374151;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 .patient-list-field {
   margin: 2px 0;
 }
 
+/* action buttons */
+
 .patient-list-actions {
   display: flex;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-left: 0.75rem;
+}
+
+.patient-list-actions button {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s ease, transform 0.05s ease;
+}
+
+.patient-list-actions button:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* detail button */
+
+.patient-list-actions .view-btn {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+/* delete button */
+
+.patient-list-actions .delete-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+  box-shadow: 0 3px 8px rgba(185, 28, 28, 0.15);
+}
+
+/* responsiveness */
+
+@media (max-width: 700px) {
+  .patient-list-item {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .patient-list-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .patient-list-name {
+    font-size: 0.95rem;
+  }
+
+  .patient-list-extra {
+    font-size: 0.82rem;
+  }
+
+  .patient-list-actions button {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* RTL support */
+[dir="rtl"] .patient-list-item {
+  text-align: right;
+}
+
+[dir="rtl"] .patient-list-actions {
+  margin-left: 0;
+  margin-right: 0.75rem;
 }

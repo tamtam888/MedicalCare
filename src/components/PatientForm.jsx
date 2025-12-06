@@ -18,8 +18,6 @@ const initialFormState = {
   notes: "",
 };
 
-
-
 function PatientForm({
   onCreatePatient,
   onUpdatePatient,
@@ -43,6 +41,7 @@ function PatientForm({
       setFormData(initialFormState);
       setError("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingPatient]);
 
   const handleChange = (event) => {
@@ -52,6 +51,11 @@ function PatientForm({
     if (name === "dateOfBirth" && value && value > today) {
       setError("Date of birth cannot be in the future.");
       return;
+    }
+
+    // Clear error when user starts typing
+    if (error) {
+      setError("");
     }
 
     setFormData((prev) => ({
@@ -133,6 +137,8 @@ function PatientForm({
           type="text"
           value={formData.idNumber}
           onChange={handleChange}
+          pattern="[0-9]*"
+          inputMode="numeric"
         />
       </div>
 
@@ -173,6 +179,7 @@ function PatientForm({
           type="tel"
           value={formData.phone}
           onChange={handleChange}
+          pattern="[0-9+\-() ]*"
         />
       </div>
 

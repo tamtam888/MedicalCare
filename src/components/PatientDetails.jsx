@@ -1,5 +1,4 @@
 // src/components/PatientDetails.jsx
-import React from "react";
 import "./PatientDetails.css";
 
 function formatAddress(patient) {

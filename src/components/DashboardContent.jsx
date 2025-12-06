@@ -12,7 +12,7 @@ const TEXTS = {
     reports: "Reports",
     upcomingAppointmentsTitle: "Upcoming appointments",
     recentTreatmentsTitle: "Recent treatments",
-    noData: "No data available"
+    noData: "No data available",
   },
   he: {
     titleBar: "MedicalCare Dashboard",
@@ -24,8 +24,8 @@ const TEXTS = {
     reports: "דוחות",
     upcomingAppointmentsTitle: "פגישות קרובות",
     recentTreatmentsTitle: "טיפולים אחרונים",
-    noData: "אין נתונים זמינים"
-  }
+    noData: "אין נתונים זמינים",
+  },
 };
 
 function DashboardContent({ language = "en", patients = [] }) {
@@ -97,3 +97,4 @@ function DashboardContent({ language = "en", patients = [] }) {
 }
 
 export default DashboardContent;
+

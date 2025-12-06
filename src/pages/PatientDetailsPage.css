@@ -1,23 +1,16 @@
-/* src/pages/PatientDetailsPage.css */
-
 .patient-details-page {
   max-width: 960px;
   margin: 0 auto;
+  padding: 1rem 0 1.75rem;
 }
 
-/* Rounded buttons on this page */
-.patient-details-page .primary-button,
-.patient-details-page .secondary-button {
-  border-radius: 999px;
-}
-
-/* Header layout */
+/* top header: name + meta + actions */
 .patient-details-header {
   display: flex;
   justify-content: space-between;
-  gap: 1.5rem;
   align-items: flex-start;
-  margin-bottom: 1rem; /* less space before Patient details */
+  gap: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .patient-details-title-block {
@@ -25,71 +18,74 @@
 }
 
 .patient-details-title {
-  margin-bottom: 0.4rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #111827;
 }
 
-/* Meta info under title */
+/* ID / DOB / gender line */
 .patient-details-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 1.1rem;
-  font-size: 0.9rem;
+  gap: 0.4rem 1.2rem;
+  font-size: 0.95rem;
   color: #6b7280;
-  text-align: left;
 }
 
 .meta-item {
-  font-size: 0.9rem;
-  color: #6b7280;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
 }
 
 .meta-item strong {
-  color: #111827;
   font-weight: 700;
+  color: #111827;
 }
 
-/* Gender select in header */
 .inline-select {
-  font-size: 0.9rem;
-  padding: 0.1rem 0.35rem;
-  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
   border: 1px solid #d1d5db;
   background-color: #ffffff;
+  font-size: 0.85rem;
 }
 
-/* Actions on the right */
+/* top actions (buttons on the right) */
 .patient-details-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
   justify-content: flex-end;
   align-items: center;
 }
 
-.primary-button.outline {
-  background-color: transparent;
-  color: #2563eb;
-  border: 1px solid #2563eb;
+/* make header buttons rounded and compact */
+.patient-details-actions .primary-button,
+.patient-details-actions .secondary-button {
+  border-radius: 999px;
+  padding: 0.28rem 0.9rem;
+  font-size: 0.85rem;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
 }
 
-.primary-button.outline:hover {
-  background-color: #eff6ff;
-}
-
-/* Import label for single patient */
+/* import label styled as a small neutral button */
 .import-single-label {
   position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0.45rem 0.9rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.8rem;
   border-radius: 999px;
+  border: 1px solid #d1d5db;
   background-color: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  font-size: 0.9rem;
-  color: #111827;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
   cursor: pointer;
-  white-space: nowrap;
 }
 
 .import-single-label:hover {
@@ -97,7 +93,7 @@
 }
 
 .import-single-text {
-  pointer-events: none;
+  white-space: nowrap;
 }
 
 .import-single-input {
@@ -107,137 +103,163 @@
   cursor: pointer;
 }
 
-/* Card layout */
+/* cards (patient details / transcription / history) */
 .patient-card {
-  background-color: #ffffff;
+  margin-bottom: 1.1rem;
+  padding: 0.4rem 1rem 0.85rem;
   border-radius: 12px;
-  padding: 1.25rem 1.5rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-  margin-bottom: 1.25rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
 }
 
-/* Left aligned section titles inside cards */
-.patient-card .section-title {
-  text-align: left;
-  font-weight: 700;
+/* titles inside cards */
+.section-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
 }
 
-/* Grid for first row in Patient details */
-/* Desktop: 3 columns, Mobile: 1 column */
+/* patient details grid (phone / email / address) */
 .patient-details-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem 1.25rem;
-  margin-top: 0.75rem;
-}
-
-/* Phone / Email / Address labels and values */
-.details-row {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.35rem;
 }
 
-.details-label {
-  font-size: 0.9rem;
-  font-weight: 700;   
-  color: #374151;
+.details-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* labels: Phone / Email / Address / Clinical status */
+.patient-details-page .details-label {
+  min-width: 110px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111827;
 }
 
 .details-value {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 0.95rem;
+}
+
+/* clinical status row */
+.status-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.55rem;
+}
+
+/* sections with textarea: Medical issues / Notes */
+.section-with-field {
+  margin-top: 0.65rem;
+}
+
+/* subtitles: Medical issues / Notes - force bold and black */
+.patient-details-page .section-subtitle {
+  display: block;
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: #111827;
 }
 
-/* Editable text */
+/* editable areas */
+.details-box {
+  display: block;
+  width: 100%;
+}
+
+/* inline editable display state */
 .editable-field {
-  cursor: pointer;
-  border-bottom: 1px dashed transparent;
+  display: inline-block;
+  min-height: 1.8em;
+  padding: 0.18rem 0.35rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: text;
 }
 
 .editable-field:hover {
-  border-bottom-color: #9ca3af;
+  background-color: #f3f4f6;
+  border-color: #e5e7eb;
 }
 
-/* Inline input */
-.inline-input {
-  font-size: 0.9rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Textarea for long text */
+/* inputs while editing */
+.inline-input,
 .text-area {
   width: 100%;
-  min-height: 80px;
-  resize: vertical;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid #d1d5db;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
-  box-sizing: border-box;
-}
-
-/* Box look for medical issues and notes */
-.details-box {
-  margin-top: 0.5rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: 8px;
-  background-color: #f9fafb;
-  border: 1px solid #e5e7eb;
-  font-size: 0.95rem;
-  color: #111827;
-  white-space: pre-wrap;
-  text-align: left;
-}
-
-/* Clinical status row under the grid */
-.status-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 1.4rem;      /* יותר רווח מהשורה של phone/email/address */
-  margin-bottom: 0.85rem;
-  text-align: left;
-}
-
-/* Clinical status label קצת יותר גדול ובולט */
-.status-row .details-label {
-  font-size: 0.95rem;
-  font-weight: 700;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.9rem;
+  background-color: #ffffff;
   color: #111827;
 }
 
-/* Subtitle for Medical issues and Notes */
-.section-with-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
-  text-align: left;
+.text-area {
+  min-height: 70px;
+  resize: vertical;
 }
 
-.section-subtitle {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #374151;
+/* export single button */
+.export-single-button {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #ffffff;
+  border: none;
 }
 
-/* Responsive layout */
+.export-single-button:hover {
+  background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+}
+
+/* responsive */
 @media (max-width: 768px) {
   .patient-details-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.75rem;
   }
 
   .patient-details-actions {
     justify-content: flex-start;
+    width: 100%;
+    flex-wrap: wrap;
   }
 
-  .patient-details-grid {
-    grid-template-columns: 1fr;
+  .details-row,
+  .status-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
+
+  .patient-details-page .details-label {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .details-value {
+    width: 100%;
+  }
+}
+
+/* RTL support */
+[dir="rtl"] .patient-details-header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .patient-details-actions {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .details-row,
+[dir="rtl"] .status-row {
+  flex-direction: row-reverse;
 }
