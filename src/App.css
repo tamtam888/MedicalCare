@@ -1,9 +1,37 @@
-/* לוגו */
-.app-logo {
-  width: 150px;
-  display: block;
-  margin: 0 auto 25px auto;
-  filter: drop-shadow(0 0 12px rgba(0,0,0,0.30));
+/* Global reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* App shell layout */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f3f4f6;
+}
+
+/* RTL support for Hebrew */
+.app-shell-rtl {
+  flex-direction: row-reverse;
 }
 
 /* מבנה כללי */
@@ -57,30 +85,185 @@
   color: #fff;
 }
 
-.empty-state {
-  font-size: 0.9rem;
+.danger-button:hover {
+  background-color: #b91c1c;
+}
+
+/* Disabled state */
+.primary-button:disabled,
+.secondary-button:disabled,
+.danger-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Medplum header button - purple theme */
+.medplum-header-button {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(129, 140, 248, 0.35);
+  border: 1px solid rgba(129, 140, 248, 0.7);
+}
+
+.medplum-header-button:hover {
+  background: linear-gradient(135deg, #8b5cf6, #4f46e5);
+}
+
+/* Old icon button (not used now, אפשר להשאיר למקרה שתרצי) */
+.lang-toggle-icon {
+  background: white;
+  color: black;
+  border: 1px solid #ddd;
+  padding: 0.45rem 0.7rem;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.lang-toggle-icon:hover {
+  background-color: #f0f0f0;
+}
+
+/* Page placeholder */
+.page-placeholder {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: #4b5563;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+.page-placeholder-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.page-placeholder-text {
+  margin: 0;
+  font-size: 0.95rem;
   color: #6b7280;
 }
 
-.error-text {
-  color: #b91c1c;
-  font-size: 0.85rem;
-  margin-top: 0.4rem;
+/* Simple container utility */
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
-.export-import-controls {
-  display: flex;
+
+/* Section wrapper */
+.app-section {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  border: 1px solid #e5e7eb;
+}
+
+.app-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .app-main {
+    padding: 1.5rem 1.25rem 1.75rem;
+  }
+
+  .app-header {
+    padding-inline: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-main-area {
+    width: 100%;
+  }
+
+  .app-header {
+    padding: 1rem 1rem 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .app-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .app-main {
+    padding: 1rem;
+  }
+
+  .page-placeholder {
+    padding: 1rem 0.8rem;
+  }
+
+  .app-title {
+    font-size: 24px;
+  }
+
+  .section-title {
+    font-size: 18px;
+  }
+}
+
+/* RTL improvements */
+[dir="rtl"] .app-header {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .app-header-right {
+  flex-direction: row-reverse;
+}
+
+/* Language switch pill: ILS | HE/EN | IL | globe */
+.lang-switch {
+  display: inline-flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 0.8rem; 
-}
-
-.import-label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  font-size: 0.8rem;
+  color: #111827;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.3);
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
 }
 
-.import-label input {
-  margin-top: 0.3rem;
+.lang-switch:hover {
+  background-color: #f9fafb;
+  box-shadow: 0 4px 10px rgba(148, 163, 184, 0.4);
+  transform: translateY(-1px);
+}
+
+.lang-switch-part {
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+.lang-switch-separator {
+  color: #d1d5db;
+}
+
+.lang-switch-icon {
+  color: #4b5563;
 }
