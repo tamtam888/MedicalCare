@@ -1,473 +1,249 @@
 // src/App.jsx
-import { useEffect, useState } from "react";
-import PatientForm from "./components/PatientForm";
-import PatientList from "./components/PatientList";
-import PatientHistory from "./components/PatientHistory";
-import AttachReports from "./components/AttachReports";
+import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { usePatients } from "./hooks/usePatients";
+import DashboardPage from "./pages/DashboardPage";
+import PatientsPage from "./pages/PatientsPage";
+import PatientDataPage from "./pages/PatientDataPage";
+import PatientDetailsPage from "./pages/PatientDetailsPage";
+import { translations } from "./i18n/translations";
+import { medplum } from "./medplumClient";
+import Sidebar from "./components/Sidebar";
 import "./App.css";
-import RecordAudio from "./components/RecordAudio";
 
-const STORAGE_KEY = "patients";
-
-function toFhirPatient(patient) {
-  return {
-    resourceType: "Patient",
-    id: patient.idNumber || "",
-    identifier: [
-      {
-        system: "local-id-number",
-        value: patient.idNumber || "",
-      },
-    ],
-    name: [
-      {
-        given: [patient.firstName || ""],
-        family: patient.lastName || "",
-      },
-    ],
-    birthDate: patient.dateOfBirth || "",
-    gender: patient.gender || "",
-    telecom: [
-      patient.phone ? { system: "phone", value: patient.phone } : null,
-      patient.email ? { system: "email", value: patient.email } : null,
-    ].filter(Boolean),
-    address: [
-      {
-        text: patient.address || "",
-        city: patient.city || "",
-        country: patient.country || "",
-      },
-    ],
-    extension: [
-      patient.medicalIssues
-        ? {
-            url: "medical-issues",
-            valueString: patient.medicalIssues,
-          }
-        : null,
-      patient.clinicalStatus
-        ? {
-            url: "clinical-status",
-            valueString: patient.clinicalStatus,
-          }
-        : null,
-    ].filter(Boolean),
-    note: patient.notes
-      ? [
-          {
-            text: patient.notes,
-          },
-        ]
-      : [],
-  };
-}
-
-function fromFhirPatient(fhirPatient) {
-  const identifier = Array.isArray(fhirPatient.identifier)
-    ? fhirPatient.identifier[0] || {}
-    : {};
-  const name = Array.isArray(fhirPatient.name)
-    ? fhirPatient.name[0] || {}
-    : {};
-  const given = Array.isArray(name.given) ? name.given[0] || "" : "";
-  const telecom = Array.isArray(fhirPatient.telecom)
-    ? fhirPatient.telecom
-    : [];
-  const phone =
-    telecom.find((t) => t.system === "phone")?.value || "";
-  const email =
-    telecom.find((t) => t.system === "email")?.value || "";
-  const address = Array.isArray(fhirPatient.address)
-    ? fhirPatient.address[0] || {}
-    : {};
-  const extensions = Array.isArray(fhirPatient.extension)
-    ? fhirPatient.extension
-    : [];
-  const medicalIssuesExt = extensions.find(
-    (ext) => ext.url === "medical-issues"
+function SimplePage({ title, text }) {
+  return (
+    <div className="page-placeholder">
+      <h1 className="page-placeholder-title">{title}</h1>
+      <p className="page-placeholder-text">{text}</p>
+    </div>
   );
-  const clinicalStatusExt = extensions.find(
-    (ext) => ext.url === "clinical-status"
-  );
-  const note = Array.isArray(fhirPatient.note)
-    ? fhirPatient.note[0]?.text || ""
-    : "";
-
-  return {
-    idNumber: (identifier.value || "").trim(),
-    firstName: given,
-    lastName: name.family || "",
-    dateOfBirth: fhirPatient.birthDate || "",
-    gender: fhirPatient.gender || "",
-    phone,
-    email,
-    address: address.text || "",
-    city: address.city || "",
-    country: address.country || "",
-    medicalIssues: medicalIssuesExt?.valueString || "",
-    clinicalStatus: clinicalStatusExt?.valueString || "",
-    notes: note,
-  };
 }
 
 function App() {
-  const [patients, setPatients] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
+  const patientsState = usePatients();
+  const { patients } = patientsState;
 
-      const parsed = JSON.parse(stored);
+  const [language, setLanguage] = useState("en");
+  const [medplumProfile, setMedplumProfile] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
-      const normalized = parsed.map((p) => ({
-        ...p,
-        history: Array.isArray(p.history) ? p.history : [],
-        reports: Array.isArray(p.reports) ? p.reports : [],
-      }));
+  const isHebrew = language === "he";
+  const t = translations[language];
 
-      return normalized;
-    } catch (error) {
-      console.error("Failed to parse patients from localStorage", error);
-      return [];
-    }
-  });
-
-  const [editingPatient, setEditingPatient] = useState(null);
-  const [selectedPatientIdNumber, setSelectedPatientIdNumber] =
-    useState(null);
+  const handleToggleLanguage = () => {
+    setLanguage((prev) => (prev === "en" ? "he" : "en"));
+  };
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
-    } catch (error) {
-      console.error("Failed to save patients to localStorage", error);
-    }
-  }, [patients]);
-
-  const selectedPatient =
-    patients.find((p) => p.idNumber === selectedPatientIdNumber) || null;
-
-  const handleCreatePatient = (formData) => {
-    const createdAt = new Date().toISOString();
-    const idNumber = String(formData.idNumber).trim();
-
-    const exists = patients.some(
-      (p) => String(p.idNumber).trim() === idNumber
-    );
-    if (exists) {
-      alert("A patient with this ID number already exists.");
-      return;
-    }
-
-    const newPatient = {
-      ...formData,
-      idNumber,
-      history: [
-        {
-          id: crypto.randomUUID(),
-          type: "Note",
-          title: "Patient profile created",
-          date: createdAt,
-          summary: "Initial patient profile was created in the system.",
-        },
-      ],
-      reports: [],
-    };
-
-    setPatients((prev) => [...prev, newPatient]);
-    setSelectedPatientIdNumber(idNumber);
-    setEditingPatient(null);
-  };
-
-  const handleUpdatePatient = (updatedData) => {
-    if (!editingPatient) return;
-
-    const newIdNumber = String(updatedData.idNumber).trim();
-    const oldIdNumber = String(editingPatient.idNumber).trim();
-
-    if (newIdNumber !== oldIdNumber) {
-      const exists = patients.some(
-        (p) => String(p.idNumber).trim() === newIdNumber
-      );
-      if (exists) {
-        alert("Another patient already uses this ID number.");
-        return;
-      }
-    }
-
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.idNumber === editingPatient.idNumber
-          ? {
-              ...p,
-              ...updatedData,
-              idNumber: newIdNumber,
-              history: Array.isArray(p.history) ? p.history : [],
-              reports: Array.isArray(p.reports) ? p.reports : [],
-            }
-          : p
-      )
-    );
-
-    setEditingPatient(null);
-    setSelectedPatientIdNumber(newIdNumber);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingPatient(null);
-  };
-
-  const handleEditPatient = (idNumber) => {
-    const patient = patients.find((p) => p.idNumber === idNumber);
-    if (!patient) return;
-
-    setEditingPatient(patient);
-    setSelectedPatientIdNumber(idNumber);
-  };
-
-  const handleDeletePatient = (idNumber) => {
-    setPatients((prev) => prev.filter((p) => p.idNumber !== idNumber));
-
-    if (selectedPatientIdNumber === idNumber) {
-      setSelectedPatientIdNumber(null);
-    }
-
-    if (editingPatient && editingPatient.idNumber === idNumber) {
-      setEditingPatient(null);
-    }
-  };
-
-  const handleSelectPatient = (idNumber) => {
-    setSelectedPatientIdNumber(idNumber);
-  };
-
-  const handleAddReport = (idNumber, reportMeta) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.idNumber !== idNumber) return p;
-
-        const reports = [...(p.reports || []), reportMeta];
-
-        const historyEntry = {
-          id: reportMeta.id,
-          type: "Report",
-          title: `Report attached: ${reportMeta.name}`,
-          date: reportMeta.uploadedAt,
-          summary: "PDF report was attached to the patient profile.",
-        };
-
-        const history = [...(p.history || []), historyEntry];
-
-        return { ...p, reports, history };
-      })
-    );
-  };
-
-  const handleExportPatients = () => {
-    if (!patients.length) {
-      alert("No patients to export.");
-      return;
-    }
-
-    const fhirBundle = {
-      resourceType: "Bundle",
-      type: "collection",
-      entry: patients.map((p) => ({
-        resource: toFhirPatient(p),
-      })),
-    };
-
-    const blob = new Blob([JSON.stringify(fhirBundle, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "patients-fhir.json";
-    link.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportPatients = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
+    async function initAuth() {
       try {
-        const json = JSON.parse(e.target.result);
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
 
-        if (
-          json.resourceType !== "Bundle" ||
-          !Array.isArray(json.entry)
-        ) {
-          alert("Invalid FHIR JSON file.");
-          return;
+        if (code) {
+          await medplum.processCode(code);
+
+          const cleanUrl =
+            window.location.origin + window.location.pathname;
+          window.history.replaceState({}, "", cleanUrl);
         }
 
-        const importedResources = json.entry
-          .map((entry) => entry.resource)
-          .filter((res) => res && res.resourceType === "Patient");
-
-        if (!importedResources.length) {
-          alert("No Patient resources found in file.");
-          return;
-        }
-
-        const importedPatients = importedResources.map(fromFhirPatient);
-
-        setPatients((prev) => {
-          const map = new Map(
-            prev.map((p) => [
-              String(p.idNumber).trim(),
-              {
-                ...p,
-                history: Array.isArray(p.history) ? p.history : [],
-                reports: Array.isArray(p.reports) ? p.reports : [],
-              },
-            ])
-          );
-
-          importedPatients.forEach((imp) => {
-            const key = String(imp.idNumber || "").trim();
-            if (!key) return;
-
-            if (map.has(key)) {
-              const existing = map.get(key);
-              map.set(key, {
-                ...existing,
-                ...imp,
-                history: existing.history,
-                reports: existing.reports,
-              });
-            } else {
-              map.set(key, {
-                ...imp,
-                history: [],
-                reports: [],
-              });
-            }
-          });
-
-          return Array.from(map.values());
-        });
-
-        alert("Patients imported successfully.");
+        const profile = medplum.getProfile();
+        setMedplumProfile(profile || null);
       } catch (error) {
-        console.error("Failed to import patients", error);
-        alert("Failed to read JSON file.");
+        console.error("Medplum authentication failed:", error);
+        setMedplumProfile(null);
+      } finally {
+        setAuthReady(true);
       }
-    };
-
-    reader.readAsText(file);
-  };
-
-  const handleSaveTranscription = (idNumber, transcriptionText) => {
-    if (!idNumber || !transcriptionText || !transcriptionText.trim()) {
-      return;
     }
 
-    const entry = {
-      id: crypto.randomUUID(),
-      type: "Transcription",
-      title: "Treatment transcription",
-      date: new Date().toISOString(),
-      summary: transcriptionText.trim(),
-    };
+    initAuth();
+  }, []);
 
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.idNumber === idNumber
-          ? {
-              ...p,
-              history: [...(p.history || []), entry],
-            }
-          : p
-      )
-    );
+  const handleConnectMedplum = () => {
+    try {
+      medplum.signInWithRedirect();
+    } catch (error) {
+      console.error("Failed to redirect to Medplum:", error);
+    }
   };
+
+  if (!authReady) {
+    return <div className="app-loading">Loading MedicalCare...</div>;
+  }
 
   return (
-    <div className="app-container">
-      <img src="/icon.png" alt="MedicalCare Icon" className="app-logo" />
+    <div className={`app-shell ${isHebrew ? "shell-rtl" : "shell-ltr"}`}>
+      <Sidebar language={language} />
 
-      <h1 className="app-title">
-        Digital Patient Record - Create patient profile
-      </h1>
-
-      <section className="app-section">
-        <h2 className="section-title">
-          {editingPatient ? "Edit patient profile" : "Create patient profile"}
-        </h2>
-        <PatientForm
-          onCreatePatient={handleCreatePatient}
-          onUpdatePatient={handleUpdatePatient}
-          editingPatient={editingPatient}
-          onCancelEdit={handleCancelEdit}
-        />
-      </section>
-
-      <section className="app-section">
-        <h2 className="section-title">Patients</h2>
-        <PatientList
-          patients={patients}
-          onEditPatient={handleEditPatient}
-          onDeletePatient={handleDeletePatient}
-          onSelectPatient={handleSelectPatient}
-        />
-      </section>
-
-      <section className="app-section">
-        <h2 className="section-title">Export and import</h2>
-        <div className="export-import-controls">
+      <div className="app-main-area" dir={isHebrew ? "rtl" : "ltr"}>
+        <header className="app-topbar">
           <button
             type="button"
-            className="primary-button"
-            onClick={handleExportPatients}
+            className="lang-toggle-button"
+            onClick={handleToggleLanguage}
           >
-            Export patients (FHIR JSON)
+            🌐 {t.langButton}
           </button>
 
-          <label className="import-label">
-            Import patients
-            <input
-              type="file"
-              accept="application/json"
-              onChange={handleImportPatients}
+          <button
+            type="button"
+            className="medplum-connect-button"
+            onClick={handleConnectMedplum}
+          >
+            {medplumProfile ? "Medplum: Connected" : "Connect to Medplum"}
+          </button>
+        </header>
+
+        <main className="app-main">
+          <Routes>
+            <Route
+              path="/"
+              element={<Navigate to="/dashboard" replace />}
             />
-          </label>
-        </div>
-      </section>
 
-      <section className="app-section">
-        <h2 className="section-title">Treatment transcription</h2>
-        <RecordAudio
-          selectedPatient={selectedPatient}
-          onSaveTranscription={handleSaveTranscription}
-        />
-      </section>
+            <Route
+              path="/dashboard"
+              element={
+                <DashboardPage
+                  patients={patients}
+                  language={language}
+                />
+              }
+            />
 
-      {selectedPatient && (
-        <section className="app-section">
-          <h2 className="section-title">
-            Patient history and reports -{" "}
-            {selectedPatient.firstName} {selectedPatient.lastName}
-          </h2>
+            <Route
+              path="/patients"
+              element={
+                <PatientsPage
+                  {...patientsState}
+                  language={language}
+                />
+              }
+            />
 
-          <PatientHistory patient={selectedPatient} />
+            <Route
+              path="/patients/:idNumber"
+              element={
+                <PatientDetailsPage
+                  patients={patientsState.patients}
+                  selectedPatient={patientsState.selectedPatient}
+                  selectedPatientFullName={
+                    patientsState.selectedPatientFullName
+                  }
+                  handleSelectPatient={patientsState.handleSelectPatient}
+                  handleAddReport={patientsState.handleAddReport}
+                  handleSaveTranscription={
+                    patientsState.handleSaveTranscription
+                  }
+                  handleEditPatient={patientsState.handleEditPatient}
+                  onUpdatePatient={patientsState.handleUpdatePatientInline}
+                  handleExportPatients={
+                    patientsState.handleExportPatients
+                  }
+                  handleImportPatients={
+                    patientsState.handleImportPatients
+                  }
+                />
+              }
+            />
 
-          <AttachReports
-            patientId={selectedPatient.idNumber}
-            existingReports={selectedPatient.reports || []}
-            onAddReport={handleAddReport}
-          />
-        </section>
-      )}
+            <Route
+              path="/data/patient"
+              element={
+                <PatientDataPage
+                  {...patientsState}
+                  language={language}
+                />
+              }
+            />
+
+            <Route
+              path="/users"
+              element={
+                <SimplePage
+                  title={t.pages.usersTitle}
+                  text={t.pages.usersText}
+                />
+              }
+            />
+
+            <Route
+              path="/data/treatment"
+              element={
+                <SimplePage
+                  title={t.pages.dataTreatmentTitle}
+                  text={t.pages.dataTreatmentText}
+                />
+              }
+            />
+
+            <Route
+              path="/data/care-plan"
+              element={
+                <SimplePage
+                  title={t.pages.dataCarePlanTitle}
+                  text={t.pages.dataCarePlanText}
+                />
+              }
+            />
+
+            <Route
+              path="/data/appointment"
+              element={
+                <SimplePage
+                  title={t.pages.dataAppointmentTitle}
+                  text={t.pages.dataAppointmentText}
+                />
+              }
+            />
+
+            <Route
+              path="/analytics"
+              element={
+                <SimplePage
+                  title={t.pages.analyticsTitle}
+                  text={t.pages.analyticsText}
+                />
+              }
+            />
+
+            <Route
+              path="/security"
+              element={
+                <SimplePage
+                  title={t.pages.securityTitle}
+                  text={t.pages.securityText}
+                />
+              }
+            />
+
+            <Route
+              path="/api"
+              element={
+                <SimplePage
+                  title={t.pages.apiTitle}
+                  text={t.pages.apiText}
+                />
+              }
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <SimplePage
+                  title={t.pages.settingsTitle}
+                  text={t.pages.settingsText}
+                />
+              }
+            />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }
 
 export default App;
-

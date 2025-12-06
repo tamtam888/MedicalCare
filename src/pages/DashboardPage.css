@@ -1,0 +1,15 @@
+/* src/pages/DashboardPage.css */
+
+.dashboard-page {
+  width: 100%;
+}
+
+.dashboard-page-ltr {
+  direction: ltr;
+  text-align: left;
+}
+
+.dashboard-page-rtl {
+  direction: rtl;
+  text-align: right;
+}

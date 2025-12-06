@@ -1,17 +1,17 @@
 // src/components/PatientHistory.jsx
 import React, { useMemo, useState } from "react";
 
-
 function PatientHistory({ patient }) {
   const [filterType, setFilterType] = useState("all");
   const [searchText, setSearchText] = useState("");
 
-  // In the future you can merge sessions, notes, care plans etc.
-  // For now, we use patient.history as a single timeline array.
-  const allEntries = patient.history || [];
+  const allEntries = useMemo(
+    () => [...(patient?.history || [])],
+    [patient?.history]
+  );
 
   const filteredEntries = useMemo(() => {
-    let entries = allEntries;
+    let entries = [...allEntries];
 
     if (filterType !== "all") {
       entries = entries.filter((entry) => entry.type === filterType);
@@ -19,15 +19,15 @@ function PatientHistory({ patient }) {
 
     if (searchText.trim() !== "") {
       const lower = searchText.toLowerCase();
-      entries = entries.filter(
-        (entry) =>
-          entry.title.toLowerCase().includes(lower) ||
-          (entry.summary && entry.summary.toLowerCase().includes(lower))
-      );
+      entries = entries.filter((entry) => {
+        const title = (entry.title || "").toLowerCase();
+        const summary = (entry.summary || "").toLowerCase();
+        return title.includes(lower) || summary.includes(lower);
+      });
     }
 
-    return [...entries].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    return entries.sort(
+      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
     );
   }, [allEntries, filterType, searchText]);
 
@@ -48,6 +48,7 @@ function PatientHistory({ patient }) {
           <option value="Note">Notes</option>
           <option value="CarePlan">Care plans</option>
           <option value="Report">Reports</option>
+          <option value="Transcription">Transcriptions</option>
         </select>
 
         <input
@@ -65,12 +66,25 @@ function PatientHistory({ patient }) {
             <div className="history-item-header">
               <span className="history-item-type">{entry.type}</span>
               <span className="history-item-date">
-                {new Date(entry.date).toLocaleDateString()}
+                {entry.date
+                  ? new Date(entry.date).toLocaleDateString()
+                  : "-"}
               </span>
             </div>
-            <div className="history-item-title">{entry.title}</div>
+
+            {entry.title && (
+              <div className="history-item-title">{entry.title}</div>
+            )}
+
             {entry.summary && (
               <div className="history-item-summary">{entry.summary}</div>
+            )}
+
+            {entry.audioData && (
+              <div className="history-item-audio">
+                <p className="history-item-audio-label">Audio recording:</p>
+                <audio controls src={entry.audioData} />
+              </div>
             )}
           </li>
         ))}
