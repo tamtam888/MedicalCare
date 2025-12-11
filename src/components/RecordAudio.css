@@ -1,91 +1,138 @@
 .record-audio-container {
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  padding: 0.9rem 1rem 1.1rem;
+  background: #ffffff;
 }
 
-.btn-start {
-  padding: 10px 15px;
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+.record-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.7rem;
 }
 
-.btn-stop {
-  padding: 10px 15px;
-  background-color: #e53935;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+.record-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #111827;
 }
 
-.audio-preview {
-  margin-top: 1rem;
+.record-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #6b7280;
 }
 
-.live-transcription-box {
-  margin-top: 1rem;
-  padding: 12px;
-  border: 1px solid #ccc;
-  background: #fefefe;
-  border-radius: 6px;
+.record-patient {
+  font-weight: 600;
+  color: #111827;
 }
 
-.transcription-text {
-  margin-top: 8px;
-  font-size: 14px;
-  line-height: 1.4;
-  color: #333;
-  min-height: 40px;
-}
-.record-audio-container {
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-}
-
-.btn-start {
-  padding: 10px 15px;
-  background-color: #4caf50;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.btn-stop {
-  padding: 10px 15px;
-  background-color: #e53935;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.audio-preview {
-  margin-top: 1rem;
-}
-
-.live-transcription-box {
-  margin-top: 1rem;
-  padding: 12px;
-  border: 1px solid #ccc;
-  background: #fefefe;
-  border-radius: 6px;
-}
-
-.transcription-text {
-  margin-top: 8px;
-  font-size: 14px;
-  line-height: 1.4;
-  color: #333;
-  min-height: 40px;
-}
-.recording-patient-label {
+.record-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+.record-btn {
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.86rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.record-btn-main {
+  background-color: #16a34a;
+  border-color: #15803d;
+  color: #ffffff;
+}
+
+.record-btn-main.record-btn-active {
+  background-color: #dc2626;
+  border-color: #b91c1c;
+}
+
+.record-btn-secondary {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.record-btn-secondary:disabled,
+.record-btn-main:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.transcription-block {
+  margin-top: 0.3rem;
+  padding: 0.8rem 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.transcription-header {
+  margin-bottom: 0.35rem;
+}
+
+.transcription-textarea {
+  width: 100%;
+  min-height: 130px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  padding: 0.7rem 0.8rem;
   font-size: 0.9rem;
-  color: #555;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.record-footer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.record-footer-btn {
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.84rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.record-save-btn {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #1d4ed8;
+}
+
+.record-ai-btn {
+  background: #ede9fe;
+  border-color: #ddd6fe;
+  color: #4c1d95;
+}
+
+.record-clear-btn {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #4b5563;
+}
+
+.record-footer-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.audio-preview {
+  margin-top: 0.75rem;
 }

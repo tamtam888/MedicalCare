@@ -3,6 +3,7 @@ import React, { useState } from "react";
 
 function AttachReports({ patientId, existingReports, onAddReport }) {
   const [uploadError, setUploadError] = useState("");
+  const reports = Array.isArray(existingReports) ? existingReports : [];
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -20,31 +21,29 @@ function AttachReports({ patientId, existingReports, onAddReport }) {
       name: file.name,
       size: file.size,
       uploadedAt: new Date().toISOString(),
-      // In a real backend you will save the file on the server.
-      // For this MVP we keep only metadata.
     };
 
-    console.log("Report uploaded for patient:", patientId, reportMeta);
+    if (typeof onAddReport === "function") {
+      onAddReport(patientId, reportMeta);
+    }
 
-    onAddReport(patientId, reportMeta);
-
-    // reset input so same file can be reselected if needed
     event.target.value = "";
   };
 
   const handleDownload = (report) => {
-    // For real backend: fetch the file from API and download
-    alert("Download is not implemented yet in the front end only MVP.");
+    alert("Download is not implemented yet in this MVP.");
   };
 
   const handleDelete = (reportId) => {
-    alert(
-      "Delete is not implemented yet in this MVP. You can add it later with backend support."
-    );
+    alert("Delete is not implemented yet in this MVP.");
   };
 
   return (
     <div className="reports-container">
+      <div className="reports-header-row">
+        <h3 className="reports-title">Reports</h3>
+      </div>
+
       <label className="file-upload-label">
         <span className="file-upload-button">Upload PDF report</span>
         <input
@@ -57,11 +56,11 @@ function AttachReports({ patientId, existingReports, onAddReport }) {
 
       {uploadError && <p className="error-text">{uploadError}</p>}
 
-      {existingReports.length === 0 ? (
+      {reports.length === 0 ? (
         <p className="empty-state">No reports uploaded yet</p>
       ) : (
         <ul className="report-list">
-          {existingReports.map((report) => (
+          {reports.map((report) => (
             <li key={report.id} className="report-item">
               <div className="report-main">
                 <span className="report-icon">📄</span>
@@ -70,7 +69,9 @@ function AttachReports({ patientId, existingReports, onAddReport }) {
                   <div className="report-meta">
                     <span>
                       {Math.round(report.size / 1024)} KB ·{" "}
-                      {new Date(report.uploadedAt).toLocaleDateString()}
+                      {report.uploadedAt
+                        ? new Date(report.uploadedAt).toLocaleDateString()
+                        : ""}
                     </span>
                   </div>
                 </div>

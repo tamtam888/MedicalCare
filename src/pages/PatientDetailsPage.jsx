@@ -1,4 +1,3 @@
-// src/pages/PatientDetailsPage.jsx
 import { useMemo, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import PatientHistory from "../components/PatientHistory";
@@ -21,30 +20,13 @@ function InlineEditable({
     if (!editing) {
       setDraft(value || "");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, editing]);
-
-  const handleClick = () => {
-    setEditing(true);
-  };
 
   const finish = () => {
     setEditing(false);
-    const next = draft;
-    if (next !== value) {
+    const next = draft ?? "";
+    if (next !== (value ?? "")) {
       onChange(next);
-    }
-  };
-
-  const handleKeyDown = (event) => {
-    if (event.key === "Enter" && !multiline) {
-      event.preventDefault();
-      finish();
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setDraft(value || "");
-      setEditing(false);
     }
   };
 
@@ -52,7 +34,7 @@ function InlineEditable({
     return (
       <span
         className={`editable-field ${className}`}
-        onClick={handleClick}
+        onClick={() => setEditing(true)}
       >
         {value && String(value).trim().length > 0 ? value : placeholder}
       </span>
@@ -65,9 +47,8 @@ function InlineEditable({
         className={`text-area ${className}`}
         value={draft}
         autoFocus
-        onChange={(e) => setDraft(e.target.value)}
         onBlur={finish}
-        onKeyDown={handleKeyDown}
+        onChange={(e) => setDraft(e.target.value)}
       />
     );
   }
@@ -78,20 +59,21 @@ function InlineEditable({
       className={`inline-input ${className}`}
       value={draft}
       autoFocus
-      onChange={(e) => setDraft(e.target.value)}
       onBlur={finish}
-      onKeyDown={handleKeyDown}
+      onChange={(e) => setDraft(e.target.value)}
     />
   );
 }
 
 function PatientDetailsPage({
   patients,
+  selectedPatient,
   selectedPatientFullName,
   handleSelectPatient,
   handleAddReport,
   handleDeleteReport,
   handleSaveTranscription,
+  handleEditPatient,
   onUpdatePatient,
   handleExportPatients,
   handleImportPatients,
@@ -99,62 +81,23 @@ function PatientDetailsPage({
   const { idNumber } = useParams();
   const navigate = useNavigate();
 
-  const patient = useMemo(() => {
-    if (!idNumber || !patients) return null;
-    const trimmedId = String(idNumber).trim();
-    if (!trimmedId) return null;
-    
-    const found = patients.find(
-      (p) => p && p.idNumber && String(p.idNumber).trim() === trimmedId
-    );
-    
-    if (import.meta.env.DEV && !found && patients.length > 0) {
-      console.warn(
-        `[PatientDetailsPage] Patient not found: ${trimmedId}. Available IDs:`,
-        patients.map((p) => p?.idNumber).filter(Boolean)
-      );
-    }
-    
-    return found || null;
-  }, [patients, idNumber]);
+  const patient = useMemo(
+    () =>
+      patients.find(
+        (p) =>
+          p.idNumber &&
+          p.idNumber.toString().trim() === String(idNumber).trim()
+      ) || null,
+    [patients, idNumber]
+  );
 
-  const [editablePatient, setEditablePatient] = useState(null);
+  const [editablePatient, setEditablePatient] = useState(patient || null);
 
   useEffect(() => {
-    if (patient) {
-      // Use setTimeout to avoid synchronous setState in effect
-      const timer = setTimeout(() => {
-        setEditablePatient(patient);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-    
-    // If patient is not found but we have patients, wait a bit for state to update
-    if (patients && patients.length > 0) {
-      const timer = setTimeout(() => {
-        const trimmedId = String(idNumber).trim();
-        const found = patients.find(
-          (p) => p && p.idNumber && String(p.idNumber).trim() === trimmedId
-        );
-        if (found) {
-          setEditablePatient(found);
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [patient, patients, idNumber]);
+    setEditablePatient(patient || null);
+  }, [patient]);
 
-  // Show loading state if patients array exists but patient not found yet
-  if (patients && patients.length > 0 && !patient && !editablePatient) {
-    return (
-      <div className="app-container patient-details-page">
-        <h1 className="app-title">Patient profile</h1>
-        <p>Loading patient data...</p>
-      </div>
-    );
-  }
-
-  if (!patient && !editablePatient) {
+  if (!patient || !editablePatient) {
     return (
       <div className="app-container patient-details-page">
         <h1 className="app-title">Patient profile</h1>
@@ -162,7 +105,7 @@ function PatientDetailsPage({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => navigate("/data/patient")}
+          onClick={() => navigate("/patients")}
         >
           Back to patients list
         </button>
@@ -170,12 +113,9 @@ function PatientDetailsPage({
     );
   }
 
-  // Use editablePatient as the source of truth
-  const currentPatient = editablePatient || patient;
-
   const fullName =
     selectedPatientFullName ||
-    [currentPatient.firstName, currentPatient.lastName]
+    [editablePatient.firstName, editablePatient.lastName]
       .filter(Boolean)
       .join(" ");
 
@@ -183,40 +123,84 @@ function PatientDetailsPage({
     setEditablePatient((prev) => {
       if (!prev) return prev;
       const updated = { ...prev, [field]: value };
-
       if (typeof onUpdatePatient === "function") {
         onUpdatePatient(updated);
       }
-
       return updated;
     });
   };
 
   const handleClose = () => {
-    navigate("/data/patient");
+    navigate("/patients");
   };
 
-  const handleSaveTranscriptionForPatient = (id, text, audioUrl) => {
-    const targetId = id || currentPatient.idNumber;
+  const clinicalStatus = (editablePatient.clinicalStatus || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  const headerStatusClass =
+    clinicalStatus === "active"
+      ? "header-active"
+      : clinicalStatus === "stable"
+      ? "header-stable"
+      : clinicalStatus === "disabled"
+      ? "header-disabled"
+      : clinicalStatus === "not active" ||
+        clinicalStatus === "not-active" ||
+        clinicalStatus === "notactive"
+      ? "header-not-active"
+      : "header-inactive";
+
+  const statusPillClass =
+    clinicalStatus === "active"
+      ? "status-pill status-active"
+      : clinicalStatus === "stable"
+      ? "status-pill status-stable"
+      : clinicalStatus === "disabled"
+      ? "status-pill status-disabled"
+      : clinicalStatus === "not active" ||
+        clinicalStatus === "not-active" ||
+        clinicalStatus === "notactive"
+      ? "status-pill status-not-active"
+      : "status-pill status-inactive";
+
+  const initials = `${editablePatient.firstName?.[0] || "?"}${
+    editablePatient.lastName?.[0] || ""
+  }`.toUpperCase();
+
+  const genderValue = (editablePatient.gender || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  const genderClass =
+    genderValue === "female" || genderValue === "f"
+      ? "avatar-female"
+      : genderValue === "male" || genderValue === "m"
+      ? "avatar-male"
+      : "avatar-other";
+
+  const handleSaveTranscriptionForPatient = (text, audioUrl) => {
+    const targetId = editablePatient.idNumber;
     const cleanText = text?.trim() || "";
     const hasAudio = Boolean(audioUrl);
 
     if (!targetId) return;
     if (!cleanText && !hasAudio) return;
 
-    handleSelectPatient(targetId);
-    handleSaveTranscription(targetId, cleanText, audioUrl);
+    if (typeof handleSelectPatient === "function") {
+      handleSelectPatient(targetId);
+    }
+
+    handleSaveTranscription(targetId, cleanText, audioUrl || "");
   };
 
   const handleAddReportForPatient = (meta) => {
-    handleSelectPatient(currentPatient.idNumber);
-    handleAddReport(currentPatient.idNumber, meta);
-  };
-
-  const handleDeleteReportForPatient = (reportId) => {
-    if (typeof handleDeleteReport === "function") {
-      handleDeleteReport(currentPatient.idNumber, reportId);
+    if (typeof handleSelectPatient === "function") {
+      handleSelectPatient(editablePatient.idNumber);
     }
+    handleAddReport(editablePatient.idNumber, meta);
   };
 
   const handleExportClick = () => {
@@ -233,48 +217,53 @@ function PatientDetailsPage({
     } else {
       alert("Import is not configured yet in the app.");
     }
-
     if (event?.target) {
       event.target.value = "";
     }
   };
 
+  const fullAddress =
+    editablePatient.address ||
+    [editablePatient.street, editablePatient.city, editablePatient.country]
+      .filter(Boolean)
+      .join(", ") ||
+    "";
+
   return (
     <div className="app-container patient-details-page">
-      <header className="patient-details-header">
-        <div className="patient-details-title-block">
-          <h1 className="app-title patient-details-title">
-            {fullName || "Unknown"}
-          </h1>
+      {/* HEADER */}
+      <div className={`patient-header-wrapper ${headerStatusClass}`}>
+        <div className="patient-header-left">
+          <div className={`patient-avatar-details ${genderClass}`}>
+            {initials}
+          </div>
 
-          <div className="patient-details-meta">
-            <span className="meta-item">
-              <strong>ID number:</strong> {currentPatient.idNumber || "-"}
-            </span>
-            <span className="meta-item">
-              <strong>Date of birth:</strong>{" "}
-              {currentPatient.dateOfBirth || "-"}
-            </span>
-            <span className="meta-item">
-              <strong>Gender:</strong>{" "}
-              <select
-                className="inline-select"
-                value={currentPatient.gender || ""}
-                onChange={(e) => updateField("gender", e.target.value)}
-              >
-                <option value="">Not set</option>
-                <option value="male">male</option>
-                <option value="female">female</option>
-                <option value="other">other</option>
-              </select>
-            </span>
+          <div className="patient-header-title-block">
+            <h1 className="patient-details-name">
+              {fullName || "Unknown patient"}
+            </h1>
+
+            <div className="patient-details-meta">
+              <span className="meta-chip">
+                <strong>ID:</strong> {editablePatient.idNumber || "-"}
+              </span>
+              <span className="meta-chip">
+                <strong>DOB:</strong> {editablePatient.dateOfBirth || "-"}
+              </span>
+              <span className="meta-chip">
+                <strong>Gender:</strong> {editablePatient.gender || "Not set"}
+              </span>
+              <span className={statusPillClass}>
+                {editablePatient.clinicalStatus || "Not Active"}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="patient-details-actions">
+        <div className="patient-header-actions">
           <button
             type="button"
-            className="secondary-button"
+            className="header-chip-btn header-chip-close"
             onClick={handleClose}
           >
             Close
@@ -282,32 +271,33 @@ function PatientDetailsPage({
 
           <button
             type="button"
-            className="primary-button outline export-single-button"
+            className="header-chip-btn"
             onClick={handleExportClick}
           >
             Export patient (FHIR JSON)
           </button>
 
-          <label className="import-single-label">
-            <span className="import-single-text">Import patient</span>
+          <label className="header-chip-btn header-chip-import">
+            <span>Import patient</span>
             <input
               type="file"
               accept="application/json"
-              className="import-single-input"
+              className="header-import-input"
               onChange={handleImportChange}
             />
           </label>
         </div>
-      </header>
+      </div>
 
+      {/* PATIENT DETAILS CARD */}
       <section className="patient-card">
         <h2 className="section-title">Patient details</h2>
 
-        <div className="patient-details-grid">
-          <div className="details-row">
-            <strong className="details-label">Phone</strong>
+        <div className="patient-details-top-row">
+          <div className="details-row-inline">
+            <span className="details-label">Phone</span>
             <InlineEditable
-              value={currentPatient.phone}
+              value={editablePatient.phone}
               placeholder="Add phone number"
               inputType="tel"
               onChange={(val) => updateField("phone", val)}
@@ -315,21 +305,21 @@ function PatientDetailsPage({
             />
           </div>
 
-          <div className="details-row">
-            <strong className="details-label">Email</strong>
+          <div className="details-row-inline">
+            <span className="details-label">Email</span>
             <InlineEditable
-              value={currentPatient.email}
-              placeholder="📧 Add email"
+              value={editablePatient.email}
+              placeholder="Add email"
               onChange={(val) => updateField("email", val)}
               className="details-value"
             />
           </div>
 
-          <div className="details-row">
-            <strong className="details-label">Address</strong>
+          <div className="details-row-inline">
+            <span className="details-label">Address</span>
             <InlineEditable
-              value={currentPatient.address}
-              placeholder="Street and number, city and country"
+              value={fullAddress}
+              placeholder="Street, city, country"
               onChange={(val) => updateField("address", val)}
               className="details-value"
             />
@@ -337,26 +327,25 @@ function PatientDetailsPage({
         </div>
 
         <div className="status-row">
-          <strong className="details-label">Clinical status</strong>
+          <span className="details-label">Clinical status</span>
           <select
-            className="inline-input details-value"
-            value={currentPatient.clinicalStatus || ""}
-            onChange={(e) =>
-              updateField("clinicalStatus", e.target.value)
-            }
+            className="inline-input status-select"
+            value={editablePatient.clinicalStatus || ""}
+            onChange={(e) => updateField("clinicalStatus", e.target.value)}
           >
-            <option value="">Not active</option>
+            <option value="">Not Active</option>
             <option value="Active">Active</option>
-            <option value="In treatment">In treatment</option>
             <option value="Stable">Stable</option>
-            <option value="Discharged">Discharged</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Disabled">Disabled</option>
+            <option value="Not Active">Not Active</option>
           </select>
         </div>
 
         <div className="section-with-field">
-          <strong className="section-subtitle">Medical issues</strong>
+          <h3 className="section-subtitle">Medical issues</h3>
           <InlineEditable
-            value={currentPatient.medicalIssues}
+            value={editablePatient.medicalIssues}
             placeholder="Chronic conditions, injuries, risk factors, operations"
             onChange={(val) => updateField("medicalIssues", val)}
             multiline
@@ -365,10 +354,10 @@ function PatientDetailsPage({
         </div>
 
         <div className="section-with-field">
-          <strong className="section-subtitle">Notes</strong>
+          <h3 className="section-subtitle">Notes</h3>
           <InlineEditable
-            value={currentPatient.notes}
-            placeholder="📝 Write your notes here..."
+            value={editablePatient.notes}
+            placeholder="Write your notes here..."
             onChange={(val) => updateField("notes", val)}
             multiline
             className="details-box"
@@ -376,22 +365,24 @@ function PatientDetailsPage({
         </div>
       </section>
 
+      {/* TRANSCRIPTION CARD */}
       <section className="patient-card">
         <h2 className="section-title">Treatment transcription</h2>
         <RecordAudio
-          selectedPatient={currentPatient}
+          selectedPatient={editablePatient}
           onSaveTranscription={handleSaveTranscriptionForPatient}
         />
       </section>
 
+      {/* HISTORY CARD */}
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
-        <PatientHistory patient={currentPatient} />
+        <PatientHistory patient={editablePatient} />
         <AttachReports
-          patientId={currentPatient.idNumber}
-          existingReports={currentPatient.reports || []}
+          patientId={editablePatient.idNumber}
+          existingReports={editablePatient.reports || []}
           onAddReport={handleAddReportForPatient}
-          onDeleteReport={handleDeleteReportForPatient}
+          onDeleteReport={handleDeleteReport}
         />
       </section>
     </div>

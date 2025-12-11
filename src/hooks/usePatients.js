@@ -390,82 +390,89 @@ export function usePatients() {
     syncToMedplum(newPatient, "new patient");
   };
 
-  const handleUpdatePatient = async (updatedData) => {
-    if (!editingPatient) return;
+  // *** NEW UPDATE LOGIC ***
+  const handleUpdatePatient = async (updatedPatient) => {
+    if (!updatedPatient) return;
 
-    const newIdNumber = trimId(updatedData.idNumber);
-    const oldIdNumber = trimId(editingPatient.idNumber);
+    const newIdNumber = trimId(updatedPatient.idNumber);
+    const oldIdNumber = trimId(updatedPatient.id);
+    const effectiveOldId = oldIdNumber || newIdNumber;
 
-    if (!newIdNumber) {
+    if (!newIdNumber && !effectiveOldId) {
       alert("ID number is required.");
       return;
     }
 
-    if (newIdNumber !== oldIdNumber && patientIdExists(newIdNumber)) {
+    const finalIdNumber = newIdNumber || effectiveOldId;
+
+    if (
+      newIdNumber &&
+      effectiveOldId &&
+      newIdNumber !== effectiveOldId &&
+      patients.some((p) => {
+        const pid = trimId(p.idNumber);
+        return pid === newIdNumber && pid !== effectiveOldId;
+      })
+    ) {
       alert("Another patient already uses this ID number.");
       return;
     }
 
     let updatedPatientRef = null;
+
     updatePatientsWithSave((prev) =>
       prev.map((p) => {
-        if (trimId(p.idNumber) !== oldIdNumber) return p;
+        const pid = trimId(p.idNumber);
+        if (!pid) return p;
+
+        const matches =
+          (effectiveOldId && pid === effectiveOldId) ||
+          (!effectiveOldId && newIdNumber && pid === newIdNumber);
+
+        if (!matches) return p;
+
         updatedPatientRef = normalizePatient({
           ...p,
-          ...updatedData,
-          idNumber: newIdNumber,
+          ...updatedPatient,
+          idNumber: finalIdNumber,
         });
+
         return updatedPatientRef;
       })
     );
 
+    if (finalIdNumber) {
+      setSelectedPatientIdNumber(finalIdNumber);
+    }
     setEditingPatient(null);
-    setSelectedPatientIdNumber(newIdNumber);
 
     if (import.meta.env.DEV) {
       console.log(
         "[handleUpdatePatient] Patient updated locally, syncing to Medplum..."
       );
     }
-    if (updatedPatientRef) syncToMedplum(updatedPatientRef, "updated patient");
+
+    if (updatedPatientRef) {
+      syncToMedplum(updatedPatientRef, "updated patient");
+    }
   };
 
   const handleUpdatePatientInline = async (updatedPatient) => {
-    if (!updatedPatient) return;
-
-    const idNumber = trimId(updatedPatient.idNumber);
-    if (!idNumber) {
-      if (import.meta.env.DEV) {
-        console.warn("handleUpdatePatientInline: missing idNumber");
-      }
-      return;
-    }
-
-    let updatedPatientRef = null;
-    updatePatientsWithSave((prev) =>
-      prev.map((p) => {
-        if (trimId(p.idNumber) !== idNumber) return p;
-        updatedPatientRef = normalizePatient({
-          ...p,
-          ...updatedPatient,
-          idNumber,
-        });
-        return updatedPatientRef;
-      })
-    );
-
-    setSelectedPatientIdNumber(idNumber);
-    if (updatedPatientRef)
-      syncToMedplum(updatedPatientRef, "inline updated patient");
+    await handleUpdatePatient(updatedPatient);
   };
 
   const handleCancelEdit = () => setEditingPatient(null);
 
   const handleEditPatient = (idNumber) => {
-    const patient = findPatientById(idNumber);
+    const patient =
+      typeof idNumber === "object" && idNumber !== null
+        ? idNumber
+        : findPatientById(idNumber);
+
     if (!patient) return;
+
     setEditingPatient(patient);
-    setSelectedPatientIdNumber(idNumber);
+    setSelectedPatientIdNumber(patient.idNumber || idNumber);
   };
 
   const handleDeletePatient = async (idNumber) => {
@@ -1248,15 +1255,23 @@ export function usePatients() {
     selectedPatientFullName,
     editingPatient,
 
+    // Add + Edit API
     handleCreatePatient,
+    handleAddPatient: handleCreatePatient,
     handleUpdatePatient,
     handleUpdatePatientInline,
     handleCancelEdit,
     handleEditPatient,
+
+    // Delete + select
     handleDeletePatient,
     handleSelectPatient,
+
+    // History and reports
     handleAddReport,
     handleDeleteReport,
+
+    // Import / export / sync
     handleExportPatients,
     handleImportPatients,
     handleSaveTranscription,

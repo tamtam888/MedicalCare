@@ -4,7 +4,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { usePatients } from "./hooks/usePatients";
 import DashboardPage from "./pages/DashboardPage";
 import PatientsPage from "./pages/PatientsPage";
-import PatientDataPage from "./pages/PatientDataPage";
 import PatientDetailsPage from "./pages/PatientDetailsPage";
 import { medplum } from "./medplumClient";
 import Sidebar from "./components/Sidebar";
@@ -95,9 +94,16 @@ function App() {
     <div className="app-shell">
       <Sidebar />
 
-      <div className="app-main-area" dir="ltr">
+      <div className="app-main-area">
         <header className="app-header">
           <div className="app-header-right">
+            <button
+              type="button"
+              className="header-icon-button"
+              title="Settings"
+            >
+              ⚙️
+            </button>
             <button
               type="button"
               className="primary-button medplum-header-button"
@@ -112,10 +118,8 @@ function App() {
 
         <main className="app-main">
           <Routes>
-            <Route
-              path="/"
-              element={<Navigate to="/dashboard" replace />}
-            />
+            {/* default redirect */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
             <Route
               path="/dashboard"
@@ -124,7 +128,17 @@ function App() {
 
             <Route
               path="/patients"
-              element={<PatientsPage {...patientsState} />}
+              element={
+                <PatientsPage
+                  patients={patientsState.patients}
+                  onAddPatient={patientsState.handleAddPatient}
+                  onUpdatePatient={patientsState.handleUpdatePatient}
+                  onDeletePatient={patientsState.handleDeletePatient}
+                  onImportPatients={patientsState.handleImportPatients}
+                  onExportPatients={patientsState.handleExportPatients}
+                  onSelectPatient={patientsState.handleSelectPatient}
+                />
+              }
             />
 
             <Route
@@ -143,30 +157,9 @@ function App() {
                     patientsState.handleSaveTranscription
                   }
                   handleEditPatient={patientsState.handleEditPatient}
-                  onUpdatePatient={
-                    patientsState.handleUpdatePatientInline
-                  }
-                  handleExportPatients={
-                    patientsState.handleExportPatients
-                  }
-                  handleImportPatients={
-                    patientsState.handleImportPatients
-                  }
-                />
-              }
-            />
-
-            <Route
-              path="/data/patient"
-              element={<PatientDataPage {...patientsState} />}
-            />
-
-            <Route
-              path="/users"
-              element={
-                <SimplePage
-                  title="Users"
-                  text="Manage users and roles. (Coming soon)"
+                  onUpdatePatient={patientsState.handleUpdatePatientInline}
+                  handleExportPatients={patientsState.handleExportPatients}
+                  handleImportPatients={patientsState.handleImportPatients}
                 />
               }
             />
@@ -239,6 +232,12 @@ function App() {
                   text="Application settings. (Coming soon)"
                 />
               }
+            />
+
+            {/* catch-all: any unknown path -> patients list */}
+            <Route
+              path="*"
+              element={<Navigate to="/patients" replace />}
             />
           </Routes>
         </main>

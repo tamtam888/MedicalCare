@@ -1,277 +1,366 @@
-// src/components/PatientForm.jsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import "./PatientForm.css";
 
-const initialFormState = {
+const defaultValues = {
+  idNumber: "",
   firstName: "",
   lastName: "",
-  idNumber: "",
-  dateOfBirth: "",
-  gender: "",
-  phone: "",
-  email: "",
-  address: "",
+  dob: "",
+  gender: "Other",
+  street: "",
   city: "",
-  country: "",
-  medicalIssues: "",
-  clinicalStatus: "",
-  notes: "",
+  zipCode: "",
+  status: "Active",
+  conditions: "",
+  phone: "",
+  email: ""
 };
 
+function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
+  const [values, setValues] = useState(defaultValues);
+  const [errors, setErrors] = useState({});
 
-
-function PatientForm({
-  onCreatePatient,
-  onUpdatePatient,
-  editingPatient,
-  onCancelEdit,
-}) {
-  const [formData, setFormData] = useState(initialFormState);
-  const [error, setError] = useState("");
-
-  const isEditing = Boolean(editingPatient);
-
-  // תאריך היום בפורמט YYYY-MM-DD כדי להשתמש ב max בשדה התאריך
   const today = new Date().toISOString().split("T")[0];
 
-  // כשעוברים ממצב יצירה למצב עריכה ולהפך
   useEffect(() => {
-    if (editingPatient) {
-      setFormData(editingPatient);
-      setError("");
+    if (initialValues) {
+      setValues({
+        ...defaultValues,
+        ...initialValues,
+        idNumber:
+          initialValues.idNumber ||
+          initialValues.id ||
+          "",
+        status:
+          initialValues.status ||
+          initialValues.clinicalStatus ||
+          defaultValues.status,
+        conditions: Array.isArray(initialValues.conditions)
+          ? initialValues.conditions.join(", ")
+          : initialValues.conditions || ""
+      });
     } else {
-      setFormData(initialFormState);
-      setError("");
+      setValues(defaultValues);
     }
-  }, [editingPatient]);
+    setErrors({});
+  }, [initialValues]);
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setValues((prev) => ({ ...prev, [name]: value }));
+  }
 
-    // מניעת תאריך לידה עתידי
-    if (name === "dateOfBirth" && value && value > today) {
-      setError("Date of birth cannot be in the future.");
-      return;
-    }
+  function validate(valuesForValidation) {
+    const newErrors = {};
+    const trimmedId = (valuesForValidation.idNumber || "").trim();
+    const trimmedFirstName = (valuesForValidation.firstName || "").trim();
+    const trimmedLastName = (valuesForValidation.lastName || "").trim();
+    const trimmedPhone = (valuesForValidation.phone || "").trim();
+    const trimmedEmail = (valuesForValidation.email || "").trim();
+    const dobValue = valuesForValidation.dob || "";
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-
-    // שדות חובה: firstName, lastName, idNumber, phone
-    if (
-      !formData.firstName ||
-      !formData.lastName ||
-      !formData.idNumber ||
-      !formData.phone
-    ) {
-      setError("Please fill in all required fields marked with *.");
-      return;
+    if (!trimmedId) {
+      newErrors.idNumber = "ID number is required.";
+    } else if (!/^\d{9}$/.test(trimmedId)) {
+      newErrors.idNumber = "ID number must be 9 digits.";
     }
 
-    // בדיקה נוספת: תאריך לידה לא עתידי
-    if (formData.dateOfBirth && formData.dateOfBirth > today) {
-      setError("Date of birth cannot be in the future.");
-      return;
+    if (!trimmedFirstName) {
+      newErrors.firstName = "First name is required.";
+    } else if (trimmedFirstName.length < 2) {
+      newErrors.firstName = "First name must be at least 2 characters.";
     }
 
-    if (isEditing) {
-      onUpdatePatient(formData);
+    if (!trimmedLastName) {
+      newErrors.lastName = "Last name is required.";
+    } else if (trimmedLastName.length < 2) {
+      newErrors.lastName = "Last name must be at least 2 characters.";
+    }
+
+    if (!trimmedPhone) {
+      newErrors.phone = "Phone number is required.";
     } else {
-      onCreatePatient(formData);
+      const digitsOnly = trimmedPhone.replace(/\D/g, "");
+      if (digitsOnly.length < 7 || digitsOnly.length > 15) {
+        newErrors.phone = "Phone must contain 7–15 digits.";
+      }
     }
 
-    setError("");
-
-    if (!isEditing) {
-      setFormData(initialFormState);
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      newErrors.email = "Email format is invalid.";
     }
-  };
+
+    if (!valuesForValidation.status) {
+      newErrors.status = "Clinical status is required.";
+    }
+
+    if (dobValue && dobValue > today) {
+      newErrors.dob = "Date of birth cannot be in the future.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    if (!validate(values)) {
+      return;
+    }
+
+    const trimmedId = (values.idNumber || "").trim();
+
+    // Start from initialValues (to keep things like medplumId, reports, history),
+    // then override with the edited form values.
+    const base = initialValues ? { ...initialValues } : {};
+
+    const prepared = {
+      ...base,
+      ...values,
+      idNumber: trimmedId,
+      id: base.id || trimmedId,
+      clinicalStatus: values.status,
+      firstName: values.firstName.trim(),
+      lastName: values.lastName.trim(),
+      phone: values.phone.trim(),
+      email: values.email.trim(),
+      city: values.city.trim(),
+      street: values.street.trim(),
+      conditions: values.conditions
+        ? values.conditions
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : []
+    };
+
+    if (onSubmit) {
+      onSubmit(prepared);
+    }
+  }
+
+  if (!isOpen) return null;
 
   return (
-    <form className="patient-form" onSubmit={handleSubmit} noValidate>
-      {error && <div className="form-error">{error}</div>}
-
-      <div className="form-field">
-        <label htmlFor="firstName">
-          First name <span className="required-asterisk">*</span>
-        </label>
-        <input
-          id="firstName"
-          name="firstName"
-          type="text"
-          value={formData.firstName}
-          onChange={handleChange}
-        />
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="lastName">
-          Last name <span className="required-asterisk">*</span>
-        </label>
-        <input
-          id="lastName"
-          name="lastName"
-          type="text"
-          value={formData.lastName}
-          onChange={handleChange}
-        />
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="idNumber">
-          ID number <span className="required-asterisk">*</span>
-        </label>
-        <input
-          id="idNumber"
-          name="idNumber"
-          type="text"
-          value={formData.idNumber}
-          onChange={handleChange}
-        />
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="dateOfBirth">Date of birth</label>
-        <input
-          id="dateOfBirth"
-          name="dateOfBirth"
-          type="date"
-          value={formData.dateOfBirth}
-          onChange={handleChange}
-          max={today} 
-        />
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="gender">Gender</label>
-        <select
-          id="gender"
-          name="gender"
-          value={formData.gender}
-          onChange={handleChange}
-        >
-          <option value="">Select</option>
-          <option value="female">Female</option>
-          <option value="male">Male</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="phone">
-          Phone number <span className="required-asterisk">*</span>
-        </label>
-        <input
-          id="phone"
-          name="phone"
-          type="tel"
-          value={formData.phone}
-          onChange={handleChange}
-        />
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-        />
-      </div>
-
-      <div className="form-row">
-  <div className="form-field">
-    <label htmlFor="address">Address</label>
-    <input
-      id="address"
-      name="address"
-      type="text"
-      value={formData.address}
-      onChange={handleChange}
-      placeholder="Street and number"
-    />
-  </div>
-</div>
-
-
-      <div className="form-row">
-  <div className="form-field">
-    <label htmlFor="city">City</label>
-    <input
-      id="city"
-      name="city"
-      type="text"
-      value={formData.city}
-      onChange={handleChange}
-    />
-  </div>
-
-  <div className="form-field">
-    <label htmlFor="country">Country</label>
-    <input
-      id="country"
-      name="country"
-      type="text"
-      value={formData.country}
-      onChange={handleChange}
-    />
-  </div>
-</div>
-
-<div className="form-row">
-  <div className="form-field">
-    <label htmlFor="medicalIssues">Medical issues</label>
-    <textarea
-      id="medicalIssues"
-      name="medicalIssues"
-      rows={3}
-      value={formData.medicalIssues}
-      onChange={handleChange}
-      placeholder="Chronic conditions, injuries, risk factors"
-    />
-  </div>
-
-  <div className="form-field">
-    <label htmlFor="clinicalStatus">Clinical status</label>
-    <select
-      id="clinicalStatus"
-      name="clinicalStatus"
-      value={formData.clinicalStatus}
-      onChange={handleChange}
-    >
-      <option value="">Not set</option>
-      <option value="active">Active</option>
-      <option value="in-treatment">In treatment</option>
-      <option value="stable">Stable</option>
-      <option value="discharged">Discharged</option>
-    </select>
-  </div>
-</div>
-
-
-      <div className="form-actions">
-        {isEditing && (
+    <div className="modal-backdrop">
+      <div className="modal-container">
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {initialValues ? "Edit Patient" : "New Patient Registration"}
+          </h2>
           <button
             type="button"
-            className="form-cancel-btn"
-            onClick={onCancelEdit}
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Close"
           >
-            Cancel
+            ×
           </button>
+        </div>
+
+        {Object.keys(errors).length > 0 && (
+          <div className="form-error">Please fix the highlighted fields.</div>
         )}
-        <button type="submit" className="form-submit-btn">
-          {isEditing ? "Update patient" : "Create patient"}
-        </button>
+
+        <form className="patient-form" onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className={`form-field ${errors.idNumber ? "has-error" : ""}`}>
+              <label htmlFor="idNumber">
+                ID Number <span className="required-marker">*</span>
+              </label>
+              <input
+                id="idNumber"
+                name="idNumber"
+                type="text"
+                value={values.idNumber}
+                onChange={handleChange}
+              />
+              {errors.idNumber && (
+                <div className="field-error">{errors.idNumber}</div>
+              )}
+            </div>
+
+            <div className={`form-field ${errors.firstName ? "has-error" : ""}`}>
+              <label htmlFor="firstName">
+                First Name <span className="required-marker">*</span>
+              </label>
+              <input
+                id="firstName"
+                name="firstName"
+                type="text"
+                value={values.firstName}
+                onChange={handleChange}
+              />
+              {errors.firstName && (
+                <div className="field-error">{errors.firstName}</div>
+              )}
+            </div>
+
+            <div className={`form-field ${errors.lastName ? "has-error" : ""}`}>
+              <label htmlFor="lastName">
+                Last Name <span className="required-marker">*</span>
+              </label>
+              <input
+                id="lastName"
+                name="lastName"
+                type="text"
+                value={values.lastName}
+                onChange={handleChange}
+              />
+              {errors.lastName && (
+                <div className="field-error">{errors.lastName}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className={`form-field ${errors.dob ? "has-error" : ""}`}>
+              <label htmlFor="dob">Date of Birth</label>
+              <input
+                id="dob"
+                name="dob"
+                type="date"
+                value={values.dob}
+                max={today}
+                onChange={handleChange}
+              />
+              {errors.dob && (
+                <div className="field-error">{errors.dob}</div>
+              )}
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="gender">Gender</label>
+              <select
+                id="gender"
+                name="gender"
+                value={values.gender}
+                onChange={handleChange}
+              >
+                <option value="Other">Other</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+              </select>
+            </div>
+
+            <div className={`form-field ${errors.status ? "has-error" : ""}`}>
+              <label htmlFor="status">
+                Clinical Status <span className="required-marker">*</span>
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={values.status}
+                onChange={handleChange}
+              >
+                <option value="Active">Active</option>
+                <option value="Stable">Stable</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Disabled">Disabled</option>
+                <option value="Not Active">Not Active</option>
+              </select>
+              {errors.status && (
+                <div className="field-error">{errors.status}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-full-width form-field">
+            <label htmlFor="street">Street Address</label>
+            <input
+              id="street"
+              name="street"
+              type="text"
+              value={values.street}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="city">City</label>
+              <input
+                id="city"
+                name="city"
+                type="text"
+                value={values.city}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="zipCode">Zip Code</label>
+              <input
+                id="zipCode"
+                name="zipCode"
+                type="text"
+                value={values.zipCode}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className={`form-field ${errors.phone ? "has-error" : ""}`}>
+              <label htmlFor="phone">
+                Phone <span className="required-marker">*</span>
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="text"
+                value={values.phone}
+                onChange={handleChange}
+              />
+              {errors.phone && (
+                <div className="field-error">{errors.phone}</div>
+              )}
+            </div>
+
+            <div className={`form-field ${errors.email ? "has-error" : ""}`}>
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={values.email}
+                onChange={handleChange}
+              />
+              {errors.email && (
+                <div className="field-error">{errors.email}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-full-width form-field">
+            <label htmlFor="conditions">Conditions</label>
+            <input
+              id="conditions"
+              name="conditions"
+              type="text"
+              value={values.conditions}
+              onChange={handleChange}
+              placeholder="Type conditions, separated by commas"
+            />
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              className="form-cancel-btn"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+
+            <button type="submit" className="form-submit-btn">
+              {initialValues ? "Save Changes" : "Add Patient"}
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 }
 
