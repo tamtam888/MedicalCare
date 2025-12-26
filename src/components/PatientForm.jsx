@@ -13,131 +13,181 @@ const defaultValues = {
   status: "Active",
   conditions: "",
   phone: "",
-  email: ""
+  email: "",
 };
+
+function toDateInputValue(d) {
+  if (!d) return "";
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v === undefined || v === null) continue;
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t !== "") return t;
+      continue;
+    }
+    return v;
+  }
+  return "";
+}
+
+function normalizeInitialValues(initialValues) {
+  if (!initialValues) return { ...defaultValues };
+
+  const addr = Array.isArray(initialValues.address)
+    ? initialValues.address[0]
+    : initialValues.address;
+
+  const idNumber = firstNonEmpty(initialValues.idNumber, initialValues.id, "");
+
+  const dobRaw = firstNonEmpty(
+    initialValues.dob,
+    initialValues.dateOfBirth,
+    initialValues.birthDate,
+    initialValues.birthDateTime,
+    ""
+  );
+  const dob = toDateInputValue(dobRaw);
+
+  const addrLine0 = Array.isArray(addr?.line) ? addr.line[0] : undefined;
+
+  const street = firstNonEmpty(
+    initialValues.street,
+    addr?.street,
+    addr?.line1,
+    addrLine0,
+    ""
+  );
+
+  const city = firstNonEmpty(initialValues.city, addr?.city, addr?.town, "");
+  const zipCode = firstNonEmpty(
+    initialValues.zipCode,
+    addr?.zipCode,
+    addr?.postalCode,
+    ""
+  );
+
+  const status = firstNonEmpty(
+    initialValues.status,
+    initialValues.clinicalStatus,
+    defaultValues.status
+  );
+
+  const conditions = Array.isArray(initialValues.conditions)
+    ? initialValues.conditions.join(", ")
+    : initialValues.conditions || "";
+
+  return {
+    ...defaultValues,
+    ...initialValues,
+    idNumber,
+    dob,
+    street,
+    city,
+    zipCode,
+    status,
+    conditions,
+  };
+}
 
 function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
   const [values, setValues] = useState(defaultValues);
   const [errors, setErrors] = useState({});
-
   const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
+    if (!isOpen) return;
+
     if (initialValues) {
-      setValues({
-        ...defaultValues,
-        ...initialValues,
-        idNumber:
-          initialValues.idNumber ||
-          initialValues.id ||
-          "",
-        status:
-          initialValues.status ||
-          initialValues.clinicalStatus ||
-          defaultValues.status,
-        conditions: Array.isArray(initialValues.conditions)
-          ? initialValues.conditions.join(", ")
-          : initialValues.conditions || ""
-      });
+      setValues(normalizeInitialValues(initialValues));
     } else {
       setValues(defaultValues);
     }
     setErrors({});
-  }, [initialValues]);
+  }, [initialValues, isOpen]);
 
   function handleChange(e) {
     const { name, value } = e.target;
     setValues((prev) => ({ ...prev, [name]: value }));
   }
 
-  function validate(valuesForValidation) {
-    const newErrors = {};
-    const trimmedId = (valuesForValidation.idNumber || "").trim();
-    const trimmedFirstName = (valuesForValidation.firstName || "").trim();
-    const trimmedLastName = (valuesForValidation.lastName || "").trim();
-    const trimmedPhone = (valuesForValidation.phone || "").trim();
-    const trimmedEmail = (valuesForValidation.email || "").trim();
-    const dobValue = valuesForValidation.dob || "";
+  function validate(v) {
+    const e = {};
+    const id = (v.idNumber || "").trim();
+    const fn = (v.firstName || "").trim();
+    const ln = (v.lastName || "").trim();
+    const phone = (v.phone || "").trim();
+    const email = (v.email || "").trim();
 
-    if (!trimmedId) {
-      newErrors.idNumber = "ID number is required.";
-    } else if (!/^\d{9}$/.test(trimmedId)) {
-      newErrors.idNumber = "ID number must be 9 digits.";
-    }
+    if (!id) e.idNumber = "ID number is required.";
+    else if (!/^\d{9}$/.test(id)) e.idNumber = "ID number must be 9 digits.";
 
-    if (!trimmedFirstName) {
-      newErrors.firstName = "First name is required.";
-    } else if (trimmedFirstName.length < 2) {
-      newErrors.firstName = "First name must be at least 2 characters.";
-    }
+    if (!fn) e.firstName = "First name is required.";
+    if (!ln) e.lastName = "Last name is required.";
 
-    if (!trimmedLastName) {
-      newErrors.lastName = "Last name is required.";
-    } else if (trimmedLastName.length < 2) {
-      newErrors.lastName = "Last name must be at least 2 characters.";
-    }
-
-    if (!trimmedPhone) {
-      newErrors.phone = "Phone number is required.";
-    } else {
-      const digitsOnly = trimmedPhone.replace(/\D/g, "");
-      if (digitsOnly.length < 7 || digitsOnly.length > 15) {
-        newErrors.phone = "Phone must contain 7–15 digits.";
+    if (!phone) e.phone = "Phone number is required.";
+    else {
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length < 7 || digits.length > 15) {
+        e.phone = "Phone must contain 7–15 digits.";
       }
     }
 
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      newErrors.email = "Email format is invalid.";
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      e.email = "Email format is invalid.";
     }
 
-    if (!valuesForValidation.status) {
-      newErrors.status = "Clinical status is required.";
+    if (v.dob && v.dob > today) {
+      e.dob = "Date of birth cannot be in the future.";
     }
 
-    if (dobValue && dobValue > today) {
-      newErrors.dob = "Date of birth cannot be in the future.";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (!validate(values)) return;
 
-    if (!validate(values)) {
-      return;
-    }
-
-    const trimmedId = (values.idNumber || "").trim();
-
-    // Start from initialValues (to keep things like medplumId, reports, history),
-    // then override with the edited form values.
     const base = initialValues ? { ...initialValues } : {};
+    const trimmedIdNumber = values.idNumber.trim();
 
     const prepared = {
       ...base,
       ...values,
-      idNumber: trimmedId,
-      id: base.id || trimmedId,
-      clinicalStatus: values.status,
+      _originalIdNumber: base.idNumber || base.id || trimmedIdNumber,
+      idNumber: trimmedIdNumber,
+      id: base.idNumber || base.id || trimmedIdNumber,
+
       firstName: values.firstName.trim(),
       lastName: values.lastName.trim(),
       phone: values.phone.trim(),
       email: values.email.trim(),
-      city: values.city.trim(),
+
       street: values.street.trim(),
+      city: values.city.trim(),
+      zipCode: values.zipCode.trim(),
+
+      status: values.status,
+      clinicalStatus: values.status,
+      dob: toDateInputValue(values.dob),
+
       conditions: values.conditions
         ? values.conditions
             .split(",")
             .map((c) => c.trim())
             .filter(Boolean)
-        : []
+        : [],
     };
 
-    if (onSubmit) {
-      onSubmit(prepared);
-    }
+    onSubmit?.(prepared);
   }
 
   if (!isOpen) return null;
@@ -166,13 +216,11 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
         <form className="patient-form" onSubmit={handleSubmit}>
           <div className="form-row">
             <div className={`form-field ${errors.idNumber ? "has-error" : ""}`}>
-              <label htmlFor="idNumber">
+              <label>
                 ID Number <span className="required-marker">*</span>
               </label>
               <input
-                id="idNumber"
                 name="idNumber"
-                type="text"
                 value={values.idNumber}
                 onChange={handleChange}
               />
@@ -182,13 +230,11 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
             </div>
 
             <div className={`form-field ${errors.firstName ? "has-error" : ""}`}>
-              <label htmlFor="firstName">
+              <label>
                 First Name <span className="required-marker">*</span>
               </label>
               <input
-                id="firstName"
                 name="firstName"
-                type="text"
                 value={values.firstName}
                 onChange={handleChange}
               />
@@ -198,13 +244,11 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
             </div>
 
             <div className={`form-field ${errors.lastName ? "has-error" : ""}`}>
-              <label htmlFor="lastName">
+              <label>
                 Last Name <span className="required-marker">*</span>
               </label>
               <input
-                id="lastName"
                 name="lastName"
-                type="text"
                 value={values.lastName}
                 onChange={handleChange}
               />
@@ -216,85 +260,53 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
 
           <div className="form-row">
             <div className={`form-field ${errors.dob ? "has-error" : ""}`}>
-              <label htmlFor="dob">Date of Birth</label>
+              <label>Date of Birth</label>
               <input
-                id="dob"
-                name="dob"
                 type="date"
+                name="dob"
                 value={values.dob}
                 max={today}
                 onChange={handleChange}
               />
-              {errors.dob && (
-                <div className="field-error">{errors.dob}</div>
-              )}
+              {errors.dob && <div className="field-error">{errors.dob}</div>}
             </div>
 
             <div className="form-field">
-              <label htmlFor="gender">Gender</label>
-              <select
-                id="gender"
-                name="gender"
-                value={values.gender}
-                onChange={handleChange}
-              >
+              <label>Gender</label>
+              <select name="gender" value={values.gender} onChange={handleChange}>
                 <option value="Other">Other</option>
                 <option value="Female">Female</option>
                 <option value="Male">Male</option>
               </select>
             </div>
 
-            <div className={`form-field ${errors.status ? "has-error" : ""}`}>
-              <label htmlFor="status">
-                Clinical Status <span className="required-marker">*</span>
-              </label>
-              <select
-                id="status"
-                name="status"
-                value={values.status}
-                onChange={handleChange}
-              >
+            <div className="form-field">
+              <label>Status</label>
+              <select name="status" value={values.status} onChange={handleChange}>
                 <option value="Active">Active</option>
                 <option value="Stable">Stable</option>
                 <option value="Inactive">Inactive</option>
                 <option value="Disabled">Disabled</option>
                 <option value="Not Active">Not Active</option>
               </select>
-              {errors.status && (
-                <div className="field-error">{errors.status}</div>
-              )}
             </div>
           </div>
 
           <div className="form-full-width form-field">
-            <label htmlFor="street">Street Address</label>
-            <input
-              id="street"
-              name="street"
-              type="text"
-              value={values.street}
-              onChange={handleChange}
-            />
+            <label>Street</label>
+            <input name="street" value={values.street} onChange={handleChange} />
           </div>
 
           <div className="form-row">
             <div className="form-field">
-              <label htmlFor="city">City</label>
-              <input
-                id="city"
-                name="city"
-                type="text"
-                value={values.city}
-                onChange={handleChange}
-              />
+              <label>City</label>
+              <input name="city" value={values.city} onChange={handleChange} />
             </div>
 
             <div className="form-field">
-              <label htmlFor="zipCode">Zip Code</label>
+              <label>Zip Code</label>
               <input
-                id="zipCode"
                 name="zipCode"
-                type="text"
                 value={values.zipCode}
                 onChange={handleChange}
               />
@@ -303,49 +315,31 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
 
           <div className="form-row">
             <div className={`form-field ${errors.phone ? "has-error" : ""}`}>
-              <label htmlFor="phone">
+              <label>
                 Phone <span className="required-marker">*</span>
               </label>
-              <input
-                id="phone"
-                name="phone"
-                type="text"
-                value={values.phone}
-                onChange={handleChange}
-              />
-              {errors.phone && (
-                <div className="field-error">{errors.phone}</div>
-              )}
+              <input name="phone" value={values.phone} onChange={handleChange} />
+              {errors.phone && <div className="field-error">{errors.phone}</div>}
             </div>
 
             <div className={`form-field ${errors.email ? "has-error" : ""}`}>
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={values.email}
-                onChange={handleChange}
-              />
-              {errors.email && (
-                <div className="field-error">{errors.email}</div>
-              )}
+              <label>Email</label>
+              <input name="email" value={values.email} onChange={handleChange} />
+              {errors.email && <div className="field-error">{errors.email}</div>}
             </div>
           </div>
 
           <div className="form-full-width form-field">
-            <label htmlFor="conditions">Conditions</label>
+            <label>Conditions</label>
             <input
-              id="conditions"
               name="conditions"
-              type="text"
               value={values.conditions}
               onChange={handleChange}
-              placeholder="Type conditions, separated by commas"
             />
           </div>
 
           <div className="form-actions">
+            {/* ✅ IMPORTANT: classes that your CSS expects */}
             <button
               type="button"
               className="form-cancel-btn"

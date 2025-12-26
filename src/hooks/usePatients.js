@@ -1,4 +1,3 @@
-// src/hooks/usePatients.js - OFFLINE FIRST STABLE VERSION
 import { useState } from "react";
 import {
   ensureArray,
@@ -26,65 +25,33 @@ function parseStorageData(raw) {
 }
 
 function loadPatientsFromLocalStorage() {
-  if (typeof window === "undefined") {
-    if (import.meta.env.DEV) {
-      console.warn("[usePatients] window is undefined, cannot load from localStorage");
-    }
-    return [];
-  }
-
+  if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = parseStorageData(raw);
-    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-      if (import.meta.env.DEV) {
-        console.log(`[usePatients] Loaded ${parsed.length} patients from localStorage`);
-      }
-      return parsed.map(normalizePatient);
-    }
+    if (parsed && parsed.length > 0) return parsed.map(normalizePatient);
 
     const backupRaw = window.localStorage.getItem(`${STORAGE_KEY}_backup`);
     const backupParsed = parseStorageData(backupRaw);
-    if (backupParsed && Array.isArray(backupParsed) && backupParsed.length > 0) {
-      if (import.meta.env.DEV) {
-        console.log(
-          `[usePatients] Loaded ${backupParsed.length} patients from backup`
-        );
-      }
+    if (backupParsed && backupParsed.length > 0) {
       return backupParsed.map(normalizePatient);
     }
 
-    if (import.meta.env.DEV) {
-      console.log("[usePatients] No patients found in localStorage");
-    }
     return [];
-  } catch (error) {
-    console.error("[usePatients] Failed to load patients:", error);
+  } catch {
     try {
       const backupRaw = window.localStorage.getItem(`${STORAGE_KEY}_backup`);
       const backupParsed = parseStorageData(backupRaw);
       if (backupParsed && Array.isArray(backupParsed)) {
-        if (import.meta.env.DEV) {
-          console.log(
-            `[usePatients] Recovered ${backupParsed.length} patients from backup`
-          );
-        }
         return backupParsed.map(normalizePatient);
       }
-    } catch (backupError) {
-      console.error("[usePatients] Failed to recover from backup:", backupError);
-    }
+    } catch {}
     return [];
   }
 }
 
 function savePatientsToLocalStorage(patients) {
-  if (typeof window === "undefined") {
-    if (import.meta.env.DEV) {
-      console.warn("[usePatients] window is undefined, cannot save");
-    }
-    return;
-  }
+  if (typeof window === "undefined") return;
 
   const safe = Array.isArray(patients) ? patients.map(normalizePatient) : [];
   const json = JSON.stringify(safe);
@@ -92,107 +59,49 @@ function savePatientsToLocalStorage(patients) {
   try {
     window.localStorage.setItem(STORAGE_KEY, json);
     window.localStorage.setItem(`${STORAGE_KEY}_backup`, json);
-    if (import.meta.env.DEV) {
-      console.log(
-        `[usePatients] Saved ${safe.length} patients (main + backup)`
-      );
-    }
-  } catch (error) {
-    console.error("[usePatients] Failed to save:", error);
+  } catch {
     try {
       window.localStorage.setItem(`${STORAGE_KEY}_backup`, json);
-      if (import.meta.env.DEV) {
-        console.log("[usePatients] Saved to backup only");
-      }
-    } catch (backupError) {
-      console.error("[usePatients] Failed to save backup:", backupError);
+    } catch {
       try {
         window.localStorage.removeItem(STORAGE_KEY);
         window.localStorage.setItem(STORAGE_KEY, json);
-        if (import.meta.env.DEV) {
-          console.log("[usePatients] Recovered: saved after cleanup");
-        }
-      } catch (finalError) {
-        console.error("[usePatients] All save attempts failed:", finalError);
-        alert(
-          "Failed to save patient data. Your data may be lost if you refresh!"
-        );
+      } catch {
+        alert("Failed to save patient data. Your data may be lost if you refresh!");
       }
     }
   }
 }
 
-/**
- * Convert audioData (data URL or raw base64) to attachment fields.
- * Returns { contentType, data } or null if invalid.
- */
 function extractAudioAttachment(audioData) {
   if (!audioData) return null;
 
   const value = String(audioData);
-  if (import.meta.env.DEV) {
-    console.log(
-      "[extractAudioAttachment] raw length:",
-      value.length,
-      "preview:",
-      value.slice(0, 40)
-    );
-  }
 
   if (value.startsWith("data:")) {
     const parts = value.split(",");
-    if (parts.length < 2) {
-      if (import.meta.env.DEV) {
-        console.warn("[extractAudioAttachment] Invalid data URL - missing comma");
-      }
-      return null;
-    }
+    if (parts.length < 2) return null;
+
     const meta = parts[0];
     const base64 = parts[1];
+    if (!base64) return null;
 
     const metaAfterPrefix = meta.split(":")[1] || "";
     const contentType = metaAfterPrefix.split(";")[0] || "audio/webm";
 
-    if (!base64) {
-      if (import.meta.env.DEV) {
-        console.warn("[extractAudioAttachment] Empty base64 part");
-      }
-      return null;
-    }
-
     return { contentType, data: base64 };
   }
 
-  return {
-    contentType: "audio/webm",
-    data: value,
-  };
+  return { contentType: "audio/webm", data: value };
 }
 
 async function ensureMedplumPatient(patient) {
-  if (!hasMedplumSession()) {
-    if (import.meta.env.DEV) {
-      console.warn("[ensureMedplumPatient] No Medplum session");
-    }
-    return null;
-  }
+  if (!hasMedplumSession()) return null;
 
-  const idNumber = trimId(patient.idNumber);
-  if (!idNumber) {
-    if (import.meta.env.DEV) {
-      console.warn("[ensureMedplumPatient] No ID number");
-    }
-    return null;
-  }
+  const idNumber = trimId(patient?.idNumber);
+  if (!idNumber) return null;
 
-  if (patient.medplumId) {
-    if (import.meta.env.DEV) {
-      console.log(
-        `[ensureMedplumPatient] Using existing medplumId: ${patient.medplumId}`
-      );
-    }
-    return patient.medplumId;
-  }
+  if (patient?.medplumId) return patient.medplumId;
 
   try {
     const searchBundle = await medplum.search("Patient", {
@@ -203,11 +112,6 @@ async function ensureMedplumPatient(patient) {
     const baseFhir = toFhirPatient(patient);
 
     if (existing?.id) {
-      if (import.meta.env.DEV) {
-        console.log(
-          `[ensureMedplumPatient] Found existing patient: ${existing.id}`
-        );
-      }
       try {
         const updated = await medplum.updateResource({
           ...existing,
@@ -215,50 +119,135 @@ async function ensureMedplumPatient(patient) {
           id: existing.id,
         });
         return updated?.id || existing.id;
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error(
-            "[ensureMedplumPatient] Update failed, using existing ID:",
-            error
-          );
-        }
+      } catch {
         return existing.id;
       }
     }
 
-    if (import.meta.env.DEV) {
-      console.log("[ensureMedplumPatient] Creating new patient in Medplum...");
-    }
     try {
       const created = await medplum.createResource(baseFhir);
-      if (import.meta.env.DEV) {
-        console.log(
-          `[ensureMedplumPatient] Created new patient: ${created.id}`
-        );
-      }
       return created?.id || null;
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[ensureMedplumPatient] Failed to create:", error);
-      }
+    } catch {
       return null;
     }
-  } catch (error) {
-    if (import.meta.env.DEV) {
-      console.error("[ensureMedplumPatient] Search failed:", error);
-    }
+  } catch {
     return null;
   }
 }
 
-export function usePatients() {
-  const [patients, setPatients] = useState(() => {
-    const loaded = loadPatientsFromLocalStorage();
-    if (import.meta.env.DEV && loaded.length > 0) {
-      console.log(`[usePatients] Initialized with ${loaded.length} patients`);
-    }
-    return loaded;
+function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
+  const map = new Map();
+
+  ensureArray(prev).forEach((p) => {
+    const key = trimId(p.idNumber || p.id || p.medplumId);
+    if (!key) return;
+    map.set(key, normalizePatient(p));
   });
+
+  ensureArray(incoming).forEach((imp) => {
+    const key = trimId(imp.idNumber || imp.id || imp.medplumId);
+    if (!key) return;
+
+    const existing = map.get(key);
+    const importedHistory = historyByIdNumber?.get?.(key);
+    const importedReports = reportsByIdNumber?.get?.(key);
+
+    if (existing) {
+      const mergedHistory = [
+        ...ensureArray(existing.history),
+        ...ensureArray(importedHistory),
+      ];
+      const uniqueHistory = [];
+      const seenHistoryIds = new Set();
+      mergedHistory.forEach((item) => {
+        const id =
+          item?.id ||
+          `${item?.date || ""}-${item?.title || ""}-${item?.summary || ""}`;
+        if (seenHistoryIds.has(id)) return;
+        seenHistoryIds.add(id);
+        uniqueHistory.push(item);
+      });
+
+      const mergedReports = [
+        ...ensureArray(existing.reports),
+        ...ensureArray(importedReports),
+      ];
+      const uniqueReports = [];
+      const seenReportIds = new Set();
+      mergedReports.forEach((report) => {
+        const id =
+          report?.id ||
+          `${report?.date || ""}-${report?.name || ""}-${report?.description || ""}`;
+        if (seenReportIds.has(id)) return;
+        seenReportIds.add(id);
+        uniqueReports.push(report);
+      });
+
+      map.set(
+        key,
+        normalizePatient({
+          ...existing,
+          ...imp,
+          idNumber: key,
+          history: uniqueHistory,
+          reports: uniqueReports,
+        })
+      );
+    } else {
+      map.set(
+        key,
+        normalizePatient({
+          ...imp,
+          idNumber: key,
+          history: ensureArray(importedHistory),
+          reports: ensureArray(importedReports),
+        })
+      );
+    }
+  });
+
+  return Array.from(map.values()).map(normalizePatient);
+}
+
+/**
+ * IMPORTANT FIX:
+ * - previous version removed "" for ALL string fields,
+ *   which prevented clearing dob/street/city/zipCode.
+ * - we allow empty strings for those fields so "delete value" is saved.
+ */
+function cleanUpdate(obj) {
+  const cleaned = {};
+  const allowEmptyStringKeys = new Set(["dob", "street", "city", "zipCode"]);
+
+  for (const [key, value] of Object.entries(obj || {})) {
+    if (value === undefined || value === null) continue;
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+
+      // allow empty string for address/dob fields (so user can clear them)
+      if (trimmed === "" && !allowEmptyStringKeys.has(key)) continue;
+
+      cleaned[key] = trimmed;
+      continue;
+    }
+
+    if (
+      (key === "history" || key === "reports") &&
+      Array.isArray(value) &&
+      value.length === 0
+    ) {
+      continue;
+    }
+
+    cleaned[key] = value;
+  }
+
+  return cleaned;
+}
+
+export function usePatients() {
+  const [patients, setPatients] = useState(() => loadPatientsFromLocalStorage());
   const [editingPatient, setEditingPatient] = useState(null);
   const [selectedPatientIdNumber, setSelectedPatientIdNumber] = useState(null);
 
@@ -267,9 +256,7 @@ export function usePatients() {
 
   const selectedPatient = findPatientById(selectedPatientIdNumber);
   const selectedPatientFullName = selectedPatient
-    ? [selectedPatient.firstName, selectedPatient.lastName]
-        .filter(Boolean)
-        .join(" ")
+    ? [selectedPatient.firstName, selectedPatient.lastName].filter(Boolean).join(" ")
     : "";
 
   const updatePatientsWithSave = (updater) => {
@@ -281,82 +268,39 @@ export function usePatients() {
     });
   };
 
+  async function createOrUpdateMedplumPatient(updatedPatient) {
+    if (!hasMedplumSession()) return;
+
+    const medplumId = await ensureMedplumPatient(updatedPatient);
+    if (!medplumId) return;
+
+    updatePatientsWithSave((prev) =>
+      prev.map((p) =>
+        trimId(p.idNumber) === trimId(updatedPatient.idNumber)
+          ? { ...p, medplumId }
+          : p
+      )
+    );
+  }
+
   const syncToMedplum = async (patient, errorContext = "patient") => {
-    if (!hasMedplumSession()) {
-      if (import.meta.env.DEV) {
-        console.warn(
-          `[syncToMedplum] No session, skipping sync for ${errorContext}`
-        );
-      }
-      return;
-    }
+    if (!hasMedplumSession()) return;
     try {
       await createOrUpdateMedplumPatient(patient);
-      if (import.meta.env.DEV) {
-        console.log(
-          `[syncToMedplum] Successfully synced ${errorContext}`
-        );
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error(
-          `[syncToMedplum] Failed to sync ${errorContext}:`,
-          error
-        );
-      }
-      alert(
-        `Failed to sync ${errorContext} to Medplum. Check your connection.`
-      );
+    } catch {
+      alert(`Failed to sync ${errorContext} to Medplum. Check your connection.`);
     }
   };
-
-  async function createOrUpdateMedplumPatient(updatedPatient) {
-    if (!hasMedplumSession()) {
-      if (import.meta.env.DEV) {
-        console.warn("[createOrUpdateMedplumPatient] No Medplum session");
-      }
-      return;
-    }
-    try {
-      const medplumId = await ensureMedplumPatient(updatedPatient);
-      if (!medplumId) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            "[createOrUpdateMedplumPatient] No medplumId returned"
-          );
-        }
-        return;
-      }
-      updatePatientsWithSave((prev) =>
-        prev.map((p) =>
-          trimId(p.idNumber) === trimId(updatedPatient.idNumber)
-            ? { ...p, medplumId }
-            : p
-        )
-      );
-      if (import.meta.env.DEV) {
-        console.log(
-          `[createOrUpdateMedplumPatient] Patient has medplumId: ${medplumId}`
-        );
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[createOrUpdateMedplumPatient] Error:", error);
-      }
-      throw error;
-    }
-  }
 
   const patientIdExists = (idNumber) =>
     patients.some((p) => trimId(p.idNumber) === trimId(idNumber));
 
   const handleCreatePatient = async (formData) => {
-    const idNumber = trimId(formData.idNumber);
+    const idNumber = trimId(formData?.idNumber);
     if (!idNumber) {
       alert("ID number is required.");
       return;
     }
-
     if (patientIdExists(idNumber)) {
       alert("A patient with this ID number already exists.");
       return;
@@ -365,6 +309,7 @@ export function usePatients() {
     const newPatient = normalizePatient({
       ...formData,
       idNumber,
+      id: formData?.id || idNumber,
       history: [
         {
           id: crypto.randomUUID(),
@@ -382,41 +327,51 @@ export function usePatients() {
     setSelectedPatientIdNumber(idNumber);
     setEditingPatient(null);
 
-    if (import.meta.env.DEV) {
-      console.log(
-        "[handleCreatePatient] Patient created locally, syncing to Medplum..."
-      );
-    }
-    syncToMedplum(newPatient, "new patient");
+    await syncToMedplum(newPatient, "new patient");
   };
 
-  // *** NEW UPDATE LOGIC ***
   const handleUpdatePatient = async (updatedPatient) => {
     if (!updatedPatient) return;
 
     const newIdNumber = trimId(updatedPatient.idNumber);
-    const oldIdNumber = trimId(updatedPatient.id);
-    const effectiveOldId = oldIdNumber || newIdNumber;
 
-    if (!newIdNumber && !effectiveOldId) {
+    /**
+     * 🔧 BUGFIX:
+     * The previous code used updatedPatient.id as "old idNumber",
+     * but `id` can be Medplum id / something else, so the map() never matched the patient.
+     *
+     * We now determine the "old idNumber" from:
+     * 1) updatedPatient._originalIdNumber (if you add it in PatientForm - best)
+     * 2) editingPatient.idNumber (available because you setEditingPatient(patient) on edit)
+     * 3) fallback to updatedPatient.idNumber
+     */
+    const oldIdNumber =
+      trimId(updatedPatient._originalIdNumber) ||
+      trimId(editingPatient?.idNumber) ||
+      newIdNumber;
+
+    if (!newIdNumber && !oldIdNumber) {
       alert("ID number is required.");
       return;
     }
 
-    const finalIdNumber = newIdNumber || effectiveOldId;
+    const finalIdNumber = newIdNumber || oldIdNumber;
 
+    // Prevent duplicates if idNumber changed
     if (
       newIdNumber &&
-      effectiveOldId &&
-      newIdNumber !== effectiveOldId &&
+      oldIdNumber &&
+      newIdNumber !== oldIdNumber &&
       patients.some((p) => {
         const pid = trimId(p.idNumber);
-        return pid === newIdNumber && pid !== effectiveOldId;
+        return pid === newIdNumber && pid !== oldIdNumber;
       })
     ) {
       alert("Another patient already uses this ID number.");
       return;
     }
+
+    const cleanedUpdate = cleanUpdate(updatedPatient);
 
     let updatedPatientRef = null;
 
@@ -425,35 +380,32 @@ export function usePatients() {
         const pid = trimId(p.idNumber);
         if (!pid) return p;
 
-        const matches =
-          (effectiveOldId && pid === effectiveOldId) ||
-          (!effectiveOldId && newIdNumber && pid === newIdNumber);
-
+        const matches = pid === oldIdNumber || pid === newIdNumber;
         if (!matches) return p;
 
         updatedPatientRef = normalizePatient({
           ...p,
-          ...updatedPatient,
+          ...cleanedUpdate,
           idNumber: finalIdNumber,
+
+          // keep id stable, but don't let it break matching
+          id: p.id || finalIdNumber,
         });
+
+        // don't persist helper field if it exists
+        if (updatedPatientRef && "_originalIdNumber" in updatedPatientRef) {
+          delete updatedPatientRef._originalIdNumber;
+        }
 
         return updatedPatientRef;
       })
     );
 
-    if (finalIdNumber) {
-      setSelectedPatientIdNumber(finalIdNumber);
-    }
+    if (finalIdNumber) setSelectedPatientIdNumber(finalIdNumber);
     setEditingPatient(null);
 
-    if (import.meta.env.DEV) {
-      console.log(
-        "[handleUpdatePatient] Patient updated locally, syncing to Medplum..."
-      );
-    }
-
     if (updatedPatientRef) {
-      syncToMedplum(updatedPatientRef, "updated patient");
+      await syncToMedplum(updatedPatientRef, "updated patient");
     }
   };
 
@@ -472,7 +424,7 @@ export function usePatients() {
     if (!patient) return;
 
     setEditingPatient(patient);
-    setSelectedPatientIdNumber(patient.idNumber || idNumber);
+    setSelectedPatientIdNumber(patient.idNumber || trimId(idNumber));
   };
 
   const handleDeletePatient = async (idNumber) => {
@@ -495,39 +447,17 @@ export function usePatients() {
 
         if (targetId) {
           await medplum.deleteResource("Patient", targetId);
-          if (import.meta.env.DEV) {
-            console.log(
-              `[handleDeletePatient] Deleted from Medplum: ${targetId}`
-            );
-          }
         }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error(
-            "[handleDeletePatient] Failed to delete from Medplum:",
-            error
-          );
-        }
+      } catch {
         alert("Failed to delete patient from Medplum.");
         return;
       }
     }
 
-    updatePatientsWithSave((prev) =>
-      prev.filter((p) => trimId(p.idNumber) !== id)
-    );
+    updatePatientsWithSave((prev) => prev.filter((p) => trimId(p.idNumber) !== id));
 
-    if (trimId(selectedPatientIdNumber) === id) {
-      setSelectedPatientIdNumber(null);
-    }
-
-    if (editingPatient && trimId(editingPatient.idNumber) === id) {
-      setEditingPatient(null);
-    }
-
-    if (import.meta.env.DEV) {
-      console.log(`[handleDeletePatient] Patient deleted: ${id}`);
-    }
+    if (trimId(selectedPatientIdNumber) === id) setSelectedPatientIdNumber(null);
+    if (editingPatient && trimId(editingPatient.idNumber) === id) setEditingPatient(null);
   };
 
   const handleSelectPatient = (idNumber) => {
@@ -536,18 +466,15 @@ export function usePatients() {
 
   const handleAddReport = (idNumber, reportMeta) => {
     const trimmedId = trimId(idNumber);
-    if (!trimmedId) {
-      if (import.meta.env.DEV) {
-        console.warn("[handleAddReport] No ID number provided");
-      }
-      return;
-    }
+    if (!trimmedId) return;
 
     let updatedPatientRef = null;
+
     updatePatientsWithSave((prev) =>
       prev.map((p) => {
         if (trimId(p.idNumber) !== trimmedId) return p;
-        updatedPatientRef = {
+
+        updatedPatientRef = normalizePatient({
           ...p,
           reports: [...ensureArray(p.reports), reportMeta],
           history: [
@@ -556,19 +483,16 @@ export function usePatients() {
               id: reportMeta.id || crypto.randomUUID(),
               type: "report",
               title: `Report attached: ${reportMeta.name}`,
-              date: reportMeta.uploadedAt,
+              date: reportMeta.uploadedAt || new Date().toISOString(),
               summary: "PDF report was attached to the patient profile.",
               audioData: null,
             },
           ],
-        };
+        });
+
         return updatedPatientRef;
       })
     );
-
-    if (import.meta.env.DEV) {
-      console.log("[handleAddReport] Report added locally");
-    }
 
     if (updatedPatientRef && hasMedplumSession()) {
       syncToMedplum(updatedPatientRef, "report attachment");
@@ -577,105 +501,78 @@ export function usePatients() {
 
   const handleDeleteReport = (idNumber, reportId) => {
     const trimmedId = trimId(idNumber);
-    if (!trimmedId || !reportId) {
-      if (import.meta.env.DEV) {
-        console.warn("[handleDeleteReport] Missing ID number or report ID");
-      }
-      return;
-    }
+    if (!trimmedId || !reportId) return;
 
-    let updatedPatientRef = null;
     updatePatientsWithSave((prev) =>
       prev.map((p) => {
         if (trimId(p.idNumber) !== trimmedId) return p;
-        updatedPatientRef = {
+
+        const nextReports = ensureArray(p.reports).filter((r) => r?.id !== reportId);
+        const nextHistory = ensureArray(p.history).filter((h) => h?.id !== reportId);
+
+        return normalizePatient({
           ...p,
-          reports: ensureArray(p.reports).filter((r) => r.id !== reportId),
-        };
-        return updatedPatientRef;
+          reports: nextReports,
+          history: nextHistory,
+        });
       })
     );
-
-    if (import.meta.env.DEV) {
-      console.log("[handleDeleteReport] Report deleted locally");
-    }
-
-    if (updatedPatientRef && hasMedplumSession()) {
-      syncToMedplum(updatedPatientRef, "report deletion");
-    }
   };
 
   const handleExportPatients = () => {
-    if (!patients.length) {
-      alert("No patients to export.");
-      return;
-    }
-
-    const entries = [];
-
-    patients.forEach((p) => {
-      const patientResource = toFhirPatient(p);
-      entries.push({ resource: patientResource });
-
-      ensureArray(p.history).forEach((item, index) => {
-        entries.push({
-          resource: historyItemToObservation(p, item, index),
-        });
-      });
-
-      ensureArray(p.reports).forEach((report, index) => {
-        entries.push({
-          resource: reportToDiagnosticReport(p, report, index),
-        });
-      });
-    });
-
-    const fhirBundle = {
-      resourceType: "Bundle",
-      type: "collection",
-      entry: entries,
-    };
-
-    const blob = new Blob([JSON.stringify(fhirBundle, null, 2)], {
-      type: "application/json",
-    });
+    const safe = ensureArray(patients).map(normalizePatient);
+    const json = JSON.stringify(safe, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `patients-export-${
-      new Date().toISOString().split("T")[0]
-    }.json`;
-    link.click();
-    URL.revokeObjectURL(url);
 
-    if (import.meta.env.DEV) {
-      console.log("[handleExportPatients] Exported FHIR bundle");
-    }
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "patients.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
   };
 
-  const handleImportPatients = (event) => {
-    const file = event.target.files?.[0];
+  const handleImportPatients = (file) => {
     if (!file) return;
 
     const reader = new FileReader();
-
-    reader.onload = (e) => {
+    reader.onload = () => {
       try {
-        const json = JSON.parse(e.target.result);
+        const raw = String(reader.result || "");
+        const json = JSON.parse(raw);
 
-        if (json.resourceType !== "Bundle" || !Array.isArray(json.entry)) {
-          alert("Invalid FHIR JSON file.");
+        const isFhirBundle =
+          json &&
+          typeof json === "object" &&
+          json.resourceType === "Bundle" &&
+          Array.isArray(json.entry);
+
+        if (!isFhirBundle) {
+          const arr = Array.isArray(json)
+            ? json
+            : Array.isArray(json?.patients)
+            ? json.patients
+            : Array.isArray(json?.data)
+            ? json.data
+            : null;
+
+          if (!arr) {
+            alert("Invalid JSON file.");
+            return;
+          }
+
+          updatePatientsWithSave((prev) => mergePatients(prev, arr));
+          alert("Patients imported successfully!");
           return;
         }
 
         const resources = json.entry.map((entry) => entry.resource).filter(Boolean);
 
-        const patientResources = resources.filter(
-          (res) => res.resourceType === "Patient"
-        );
-        const observationResources = resources.filter(
-          (res) => res.resourceType === "Observation"
-        );
+        const patientResources = resources.filter((res) => res.resourceType === "Patient");
+        const observationResources = resources.filter((res) => res.resourceType === "Observation");
         const diagnosticResources = resources.filter(
           (res) => res.resourceType === "DiagnosticReport"
         );
@@ -693,8 +590,7 @@ export function usePatients() {
           let audioData = null;
           if (Array.isArray(obs.extension)) {
             const audioExt = obs.extension.find(
-              (ext) =>
-                ext.url === "https://medicalcare.local/extension/audioData"
+              (ext) => ext.url === "https://medicalcare.local/extension/audioData"
             );
             if (audioExt && typeof audioExt.valueString === "string") {
               audioData = audioExt.valueString;
@@ -736,82 +632,13 @@ export function usePatients() {
           reportsByIdNumber.set(idNumber, list);
         });
 
-        updatePatientsWithSave((prev) => {
-          const map = new Map(
-            prev.map((p) => [trimId(p.idNumber), normalizePatient(p)])
-          );
+        updatePatientsWithSave((prev) =>
+          mergePatients(prev, importedPatients, historyByIdNumber, reportsByIdNumber)
+        );
 
-          importedPatients.forEach((imp) => {
-            const key = trimId(imp.idNumber);
-            if (!key) return;
-
-            const importedHistory = historyByIdNumber.get(key) || [];
-            const importedReports = reportsByIdNumber.get(key) || [];
-
-            if (map.has(key)) {
-              const existing = map.get(key);
-
-              const mergedHistory = [
-                ...ensureArray(existing.history),
-                ...importedHistory,
-              ];
-              const mergedReports = [
-                ...ensureArray(existing.reports),
-                ...importedReports,
-              ];
-
-              const uniqueHistory = [];
-              const seenHistoryIds = new Set();
-
-              mergedHistory.forEach((item) => {
-                const id =
-                  item.id || `${item.date || ""}-${item.title || ""}`;
-                if (seenHistoryIds.has(id)) return;
-                seenHistoryIds.add(id);
-                uniqueHistory.push(item);
-              });
-
-              const uniqueReports = [];
-              const seenReportIds = new Set();
-
-              mergedReports.forEach((report) => {
-                const id =
-                  report.id || `${report.date || ""}-${report.name || ""}`;
-                if (seenReportIds.has(id)) return;
-                seenReportIds.add(id);
-                uniqueReports.push(report);
-              });
-
-              map.set(
-                key,
-                normalizePatient({
-                  ...existing,
-                  ...imp,
-                  history: uniqueHistory,
-                  reports: uniqueReports,
-                })
-              );
-            } else {
-              map.set(
-                key,
-                normalizePatient({
-                  ...imp,
-                  history: importedHistory,
-                  reports: importedReports,
-                })
-              );
-            }
-          });
-
-          return Array.from(map.values()).map(normalizePatient);
-        });
-
-        if (import.meta.env.DEV) {
-          console.log("[handleImportPatients] Patients imported successfully");
-        }
         alert("Patients imported successfully!");
       } catch (error) {
-        console.error("[handleImportPatients] Failed to import:", error);
+        console.error("[handleImportPatients] Failed:", error);
         alert("Import failed. Check console for details.");
       }
     };
@@ -819,27 +646,13 @@ export function usePatients() {
     reader.readAsText(file);
   };
 
-  const handleSaveTranscription = async (
-    idNumber,
-    transcriptionText,
-    audioData
-  ) => {
+  const handleSaveTranscription = async (idNumber, transcriptionText, audioData) => {
     const trimmedId = trimId(idNumber);
     const cleanText = (transcriptionText || "").trim();
     const cleanAudio = audioData || null;
 
-    if (!trimmedId) {
-      if (import.meta.env.DEV) {
-        console.warn("[handleSaveTranscription] No ID number provided");
-      }
-      return;
-    }
-    if (!cleanText && !cleanAudio) {
-      if (import.meta.env.DEV) {
-        console.warn("[handleSaveTranscription] No text or audio provided");
-      }
-      return;
-    }
+    if (!trimmedId) return;
+    if (!cleanText && !cleanAudio) return;
 
     const now = new Date().toISOString();
     let updatedPatientRef = null;
@@ -859,179 +672,78 @@ export function usePatients() {
         };
 
         newHistoryItemRef = historyItem;
-        updatedPatientRef = {
+
+        updatedPatientRef = normalizePatient({
           ...p,
           history: [...ensureArray(p.history), historyItem],
-        };
+        });
+
         return updatedPatientRef;
       })
     );
 
-    if (import.meta.env.DEV) {
-      console.log("[handleSaveTranscription] Step 1: Saved to localStorage");
-    }
-
     if (!hasMedplumSession()) {
-      if (import.meta.env.DEV) {
-        console.log(
-          "[handleSaveTranscription] No Medplum session, saved locally only"
-        );
-      }
       alert("Transcription saved locally (no Medplum connection)");
       return;
     }
 
-    if (!updatedPatientRef || !newHistoryItemRef) {
-      if (import.meta.env.DEV) {
-        console.warn(
-          "[handleSaveTranscription] No patient or history item to sync"
+    if (!updatedPatientRef || !newHistoryItemRef) return;
+
+    try {
+      const medplumId = await ensureMedplumPatient(updatedPatientRef);
+      if (!medplumId) return;
+
+      if (!updatedPatientRef.medplumId) {
+        updatePatientsWithSave((prev) =>
+          prev.map((p) =>
+            trimId(p.idNumber) === trimmedId ? { ...p, medplumId } : p
+          )
         );
+        updatedPatientRef = { ...updatedPatientRef, medplumId };
       }
-      return;
-    }
 
-    (async () => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log(
-            "[handleSaveTranscription] Step 2: Syncing to Medplum..."
-          );
-        }
+      const subjectRef = `Patient/${medplumId}`;
 
-        const medplumId = await ensureMedplumPatient(updatedPatientRef);
+      const observation = {
+        resourceType: "Observation",
+        status: "final",
+        subject: { reference: subjectRef },
+        effectiveDateTime: now,
+        code: { text: newHistoryItemRef.title || "Treatment transcription" },
+        note: cleanText ? [{ text: cleanText }] : [],
+      };
 
-        if (!medplumId) {
-          if (import.meta.env.DEV) {
-            console.warn(
-              "[handleSaveTranscription] Failed to get medplumId"
-            );
-          }
-          return;
-        }
-
-        if (!updatedPatientRef.medplumId) {
-          updatePatientsWithSave((prev) =>
-            prev.map((p) =>
-              trimId(p.idNumber) === trimmedId ? { ...p, medplumId } : p
-            )
-          );
-          updatedPatientRef = { ...updatedPatientRef, medplumId };
-        }
-
-        const subjectRef = `Patient/${medplumId}`;
-
-        const observation = {
-          resourceType: "Observation",
-          status: "final",
-          subject: { reference: subjectRef },
-          effectiveDateTime: now,
-          code: {
-            text: newHistoryItemRef.title || "Treatment transcription",
+      const audioAttachment = extractAudioAttachment(cleanAudio);
+      if (audioAttachment) {
+        observation.extension = [
+          {
+            url: "https://medicalcare.local/extension/audioData",
+            valueString: cleanAudio,
           },
-          note: cleanText ? [{ text: cleanText }] : [],
-        };
-
-        const audioExtension = extractAudioAttachment(cleanAudio);
-        if (audioExtension) {
-          observation.extension = [
-            {
-              url: "https://medicalcare.local/extension/audioData",
-              valueString: cleanAudio,
-            },
-          ];
-        }
-
-        const createdObservation = await medplum.createResource(observation);
-
-        if (import.meta.env.DEV) {
-          console.log(
-            `[handleSaveTranscription] Created Observation: ${createdObservation.id}`
-          );
-        }
-
-        if (cleanAudio) {
-          try {
-            const attachment = extractAudioAttachment(cleanAudio);
-            if (!attachment) {
-              if (import.meta.env.DEV) {
-                console.warn(
-                  "[handleSaveTranscription] Could not extract audio attachment for Media"
-                );
-              }
-            } else {
-              const media = {
-                resourceType: "Media",
-                status: "completed",
-                subject: { reference: subjectRef },
-                createdDateTime: now,
-                type: {
-                  text: "Audio recording",
-                },
-                content: {
-                  contentType: attachment.contentType,
-                  data: attachment.data,
-                  title: "Treatment Audio Recording",
-                },
-              };
-
-              const createdMedia = await medplum.createResource(media);
-
-              if (import.meta.env.DEV) {
-                console.log(
-                  `[handleSaveTranscription] Created Media: ${createdMedia.id}`
-                );
-              }
-            }
-          } catch (mediaError) {
-            if (import.meta.env.DEV) {
-              console.error(
-                "[handleSaveTranscription] Failed to create Media (audio):",
-                mediaError
-              );
-            }
-          }
-        }
-
-        if (import.meta.env.DEV) {
-          console.log(
-            "[handleSaveTranscription] Full sync completed successfully"
-          );
-        }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error(
-            "[handleSaveTranscription] Medplum sync failed:",
-            error
-          );
-        }
+        ];
       }
-    })();
 
-    alert("Transcription saved successfully!");
+      await medplum.createResource(observation);
+    } catch (error) {
+      console.error("[handleSaveTranscription] Medplum sync failed:", error);
+      alert("Saved locally, but failed to sync transcription to Medplum.");
+    }
   };
 
   const handleSyncAllToMedplum = async () => {
     if (!hasMedplumSession()) {
-      alert("Not connected to Medplum. Please sign in first.");
+      alert("Please sign in first.");
       return;
     }
 
     const confirmSync = confirm(
-      `This will sync ${patients.length} patients and all their data to Medplum.\n\nThis includes:\n• Patient demographics\n• All transcriptions\n• All audio recordings\n• All reports\n\nContinue?`
+      `This will sync ${patients.length} patients and all their data to Medplum.\n\nContinue?`
     );
-
     if (!confirmSync) return;
 
     try {
-      if (import.meta.env.DEV) {
-        console.log(
-          "[handleSyncAllToMedplum] STARTING FULL SYNC..."
-        );
-      }
-
-      alert("Starting full sync... This may take a few minutes.");
-
       const updatedPatients = [...patients];
+
       let successCount = 0;
       let errorCount = 0;
       const errors = [];
@@ -1042,61 +754,29 @@ export function usePatients() {
         if (!idNumber) continue;
 
         try {
-          if (import.meta.env.DEV) {
-            console.log(
-              `[handleSyncAllToMedplum] Processing ${i + 1}/${
-                updatedPatients.length
-              }: ${p.firstName} ${p.lastName}`
-            );
-          }
-
           let medplumId = p.medplumId || null;
 
           try {
-            medplumId =
-              (await ensureMedplumPatient(
-                medplumId ? p : { ...p, medplumId: null }
-              )) || medplumId;
-          } catch (error) {
-            if (import.meta.env.DEV) {
-              console.warn(
-                `[handleSyncAllToMedplum] Failed to ensure patient ${idNumber}:`,
-                error
-              );
-            }
+            medplumId = (await ensureMedplumPatient({ ...p, medplumId: null })) || medplumId;
+          } catch (e) {
             errorCount++;
-            errors.push(
-              `${p.firstName} ${p.lastName}: ${error.message}`
-            );
+            errors.push(`${p.firstName} ${p.lastName}: ${e?.message || "Ensure patient failed"}`);
             continue;
           }
 
           if (!medplumId) {
-            if (import.meta.env.DEV) {
-              console.warn(
-                `[handleSyncAllToMedplum] No medplumId for ${idNumber}`
-              );
-            }
             errorCount++;
-            errors.push(
-              `${p.firstName} ${p.lastName}: Could not get Medplum ID`
-            );
+            errors.push(`${p.firstName} ${p.lastName}: Could not get Medplum ID`);
             continue;
           }
 
           updatedPatients[i] = { ...p, medplumId };
+
           const subjectRef = `Patient/${medplumId}`;
 
           const history = ensureArray(updatedPatients[i].history);
-          if (import.meta.env.DEV) {
-            console.log(
-              `[handleSyncAllToMedplum] Syncing ${history.length} history items...`
-            );
-          }
-
           for (let j = 0; j < history.length; j++) {
             const item = history[j];
-
             try {
               const baseObservation = historyItemToObservation(
                 { ...updatedPatients[i], medplumId },
@@ -1104,7 +784,6 @@ export function usePatients() {
                 j
               );
               baseObservation.subject = { reference: subjectRef };
-
               await medplum.createResource(baseObservation);
 
               if (item.audioData) {
@@ -1114,138 +793,55 @@ export function usePatients() {
                     resourceType: "Media",
                     status: "completed",
                     subject: { reference: subjectRef },
-                    createdDateTime:
-                      item.date || new Date().toISOString(),
-                    type: {
-                      text: "Audio recording",
-                    },
+                    createdDateTime: item.date || new Date().toISOString(),
                     content: {
                       contentType: attachment.contentType,
                       data: attachment.data,
-                      title: item.title || "Audio Recording",
                     },
                   };
-
                   await medplum.createResource(media);
-
-                  if (import.meta.env.DEV) {
-                    console.log(
-                      `[handleSyncAllToMedplum] Audio synced for history item ${
-                        j + 1
-                      }`
-                    );
-                  }
-                } else if (import.meta.env.DEV) {
-                  console.warn(
-                    `[handleSyncAllToMedplum] Could not extract attachment for history item ${
-                      j + 1
-                    }`
-                  );
                 }
               }
-            } catch (historyError) {
-              if (import.meta.env.DEV) {
-                console.warn(
-                  `[handleSyncAllToMedplum] Failed history item ${
-                    j + 1
-                  }:`,
-                  historyError
-                );
-              }
-            }
+            } catch {}
           }
 
           const reports = ensureArray(updatedPatients[i].reports);
-          if (import.meta.env.DEV && reports.length > 0) {
-            console.log(
-              `[handleSyncAllToMedplum] Syncing ${reports.length} reports...`
-            );
-          }
-
           for (let k = 0; k < reports.length; k++) {
-            const report = reports[k];
-
+            const rep = reports[k];
             try {
-              const diagnostic = reportToDiagnosticReport(
-                { ...updatedPatients[i], medplumId },
-                report,
-                k
-              );
-
-              diagnostic.subject = { reference: subjectRef };
-
-              await medplum.createResource(diagnostic);
-
-              if (import.meta.env.DEV) {
-                console.log(
-                  `[handleSyncAllToMedplum] Report ${k + 1} synced`
-                );
-              }
+              const dr = reportToDiagnosticReport({ ...updatedPatients[i], medplumId }, rep, k);
+              dr.subject = { reference: subjectRef };
+              await medplum.createResource(dr);
             } catch (reportError) {
               if (import.meta.env.DEV) {
-                console.warn(
-                  `[handleSyncAllToMedplum] Failed report ${
-                    k + 1
-                  }:`,
-                  reportError
-                );
+                console.warn(`[handleSyncAllToMedplum] Failed report ${k + 1}:`, reportError);
               }
             }
           }
 
           successCount++;
-          if (import.meta.env.DEV) {
-            console.log(
-              `[handleSyncAllToMedplum] Patient ${i + 1}/${
-                updatedPatients.length
-              } synced`
-            );
-          }
         } catch (error) {
-          if (import.meta.env.DEV) {
-            console.error(
-              `[handleSyncAllToMedplum] Error syncing patient ${idNumber}:`,
-              error
-            );
-          }
           errorCount++;
-          errors.push(
-            `${p.firstName} ${p.lastName}: ${error.message}`
-          );
+          errors.push(`${p.firstName} ${p.lastName}: ${error?.message || "Unknown error"}`);
         }
       }
 
       updatePatientsWithSave(updatedPatients);
-
-      if (import.meta.env.DEV) {
-        console.log(
-          `[handleSyncAllToMedplum] SYNC COMPLETED: ${successCount} succeeded, ${errorCount} failed`
-        );
-        if (errors.length > 0) {
-          console.error("[handleSyncAllToMedplum] Errors:", errors);
-        }
-      }
 
       let message = `Full sync completed!\n\n`;
       message += `Success: ${successCount} patients\n`;
       if (errorCount > 0) {
         message += `Failed: ${errorCount} patients\n\n`;
         message += `Check console for details.`;
+        console.error("[handleSyncAllToMedplum] Errors:", errors);
       } else {
         message += `All data is now in Medplum.`;
       }
 
       alert(message);
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error(
-          "[handleSyncAllToMedplum] FULL SYNC FAILED:",
-          error
-        );
-      }
-      alert(
-        "Full sync to Medplum failed. Check console for details."
-      );
+      console.error("[handleSyncAllToMedplum] FULL SYNC FAILED:", error);
+      alert("Full sync to Medplum failed. Check console for details.");
     }
   };
 
@@ -1255,7 +851,6 @@ export function usePatients() {
     selectedPatientFullName,
     editingPatient,
 
-    // Add + Edit API
     handleCreatePatient,
     handleAddPatient: handleCreatePatient,
     handleUpdatePatient,
@@ -1263,15 +858,12 @@ export function usePatients() {
     handleCancelEdit,
     handleEditPatient,
 
-    // Delete + select
     handleDeletePatient,
     handleSelectPatient,
 
-    // History and reports
     handleAddReport,
     handleDeleteReport,
 
-    // Import / export / sync
     handleExportPatients,
     handleImportPatients,
     handleSaveTranscription,
