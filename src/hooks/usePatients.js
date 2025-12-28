@@ -15,132 +15,124 @@ import { medplum } from "../medplumClient";
 const STORAGE_KEY = "patients:main";
 const BACKUP_KEY = "patients:backup";
 
-/**
- * IMPORTANT:
- * - Source of truth (real app): localStorage
- * - Tests: fall back to window.storage when localStorage is empty/unavailable
- * - Medplum is optional sync; never used as source-of-truth for the local list
- */
+// === SAFE STORAGE FUNCTIONS (using window.storage API) ===
+async function safeStorageGet(key) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    if (window?.storage?.getItem) {
+      return window.storage.getItem(key);
+    }
+  } catch (error) {
+    void error;
+  }
+
+  try {
+    if (window?.storage?.get) {
+      const result = await window.storage.get(key);
+      return result?.value ?? null;
+    }
+  } catch (error) {
+    void error;
+  }
+
+  try {
+    return window.localStorage.getItem(key);
+  } catch (error) {
+    void error;
+    return null;
+  }
+}
+
+async function safeStorageSet(key, value) {
+  if (typeof window === "undefined") return false;
+
+  let ok = false;
+
+  try {
+    if (window?.storage?.setItem) {
+      window.storage.setItem(key, value);
+      ok = true;
+    }
+  } catch (error) {
+    void error;
+  }
+
+  try {
+    if (window?.storage?.set) {
+      await window.storage.set(key, value);
+      ok = true;
+    }
+  } catch (error) {
+    void error;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+    ok = true;
+  } catch (error) {
+    void error;
+  }
+
+  return ok;
+}
 
 function safeParseArray(raw) {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : null;
-  } catch {
+  } catch (error) {
+    void error;
     return null;
   }
 }
 
-// Read: localStorage first, window.storage fallback (tests)
-async function storageGet(key) {
-  if (typeof window === "undefined") return null;
-
-  // 1) localStorage first (real app source of truth)
-  try {
-    const v = window.localStorage?.getItem?.(key);
-    if (v !== null && v !== undefined) return v;
-  } catch {
-    // ignore
-  }
-
-  // 2) fallback: window.storage (tests / special env)
-  try {
-    if (window?.storage?.getItem) return window.storage.getItem(key);
-  } catch {
-    // ignore
-  }
-
-  try {
-    if (window?.storage?.get) {
-      const res = await window.storage.get(key);
-      return res?.value ?? null;
-    }
-  } catch {
-    // ignore
-  }
-
-  return null;
-}
-
-// Write: always localStorage, and also window.storage if present (tests assert on it)
-async function storageSet(key, value) {
-  if (typeof window === "undefined") return false;
-
-  let wrote = false;
-
-  try {
-    window.localStorage?.setItem?.(key, value);
-    wrote = true;
-  } catch {
-    // ignore
-  }
-
-  try {
-    if (window?.storage?.setItem) {
-      window.storage.setItem(key, value);
-      wrote = true;
-    }
-  } catch {
-    // ignore
-  }
-
-  try {
-    if (window?.storage?.set) {
-      await window.storage.set(key, value);
-      wrote = true;
-    }
-  } catch {
-    // ignore
-  }
-
-  return wrote;
-}
-
-// === LOAD PATIENTS (localStorage first, window.storage fallback for tests) ===
+// === LOAD PATIENTS ===
 async function loadPatientsFromStorage() {
-  // Try main first
-  const mainRaw = await storageGet(STORAGE_KEY);
+  if (typeof window === "undefined") return [];
+
+  // Try main storage first
+  const mainRaw = await safeStorageGet(STORAGE_KEY);
   const mainParsed = safeParseArray(mainRaw);
   if (mainParsed && mainParsed.length > 0) {
     return mainParsed.map(normalizePatient);
   }
 
-  // Main is empty OR corrupted -> try backup
-  const backupRaw = await storageGet(BACKUP_KEY);
+  // Try backup
+  const backupRaw = await safeStorageGet(BACKUP_KEY);
   const backupParsed = safeParseArray(backupRaw);
   if (backupParsed && backupParsed.length > 0) {
-    const safe = backupParsed.map(normalizePatient);
-    const json = JSON.stringify(safe);
-
-    // Repair main and keep backup in sync
-    await storageSet(STORAGE_KEY, json);
-    await storageSet(BACKUP_KEY, json);
-
-    return safe;
+    const json = JSON.stringify(backupParsed);
+    await safeStorageSet(STORAGE_KEY, json);
+    await safeStorageSet(BACKUP_KEY, json);
+    return backupParsed.map(normalizePatient);
   }
 
   return [];
 }
 
-// === SAVE PATIENTS (writes to localStorage, mirrors to window.storage if present) ===
+// === SAVE PATIENTS ===
 async function savePatientsToStorage(
   patients,
   { allowEmpty = false, allowEmptyOverwrite = false } = {}
 ) {
+  if (typeof window === "undefined") return;
+
   const allowEmptyFinal = Boolean(allowEmpty || allowEmptyOverwrite);
   const safe = Array.isArray(patients) ? patients.map(normalizePatient) : [];
 
-  // Prevent overwriting existing non-empty storage with empty array (unless explicitly allowed)
   if (!allowEmptyFinal && safe.length === 0) {
-    const existingRaw = await storageGet(STORAGE_KEY);
+    const existingRaw = await safeStorageGet(STORAGE_KEY);
     const existing = safeParseArray(existingRaw);
-    if (existing && existing.length > 0) return;
+    if (existing && existing.length > 0) {
+      return;
+    }
   }
 
   const json = JSON.stringify(safe);
-  await storageSet(STORAGE_KEY, json);
-  await storageSet(BACKUP_KEY, json);
+  await safeStorageSet(STORAGE_KEY, json);
+  await safeStorageSet(BACKUP_KEY, json);
 }
 
 function cleanUpdate(obj) {
@@ -194,13 +186,11 @@ async function ensureMedplumPatient(patient) {
   if (patient?.medplumId) return patient.medplumId;
 
   const baseFhir = toFhirPatient(patient);
-
   try {
     const searchBundle = await medplum.search("Patient", {
       identifier: `${ID_SYSTEM}|${idNumber}`,
     });
     const existing = searchBundle.entry?.[0]?.resource;
-
     if (existing?.id) {
       try {
         const updated = await medplum.updateResource({
@@ -214,7 +204,6 @@ async function ensureMedplumPatient(patient) {
         return existing.id;
       }
     }
-
     const created = await medplum.createResource(baseFhir);
     return created?.id || null;
   } catch (error) {
@@ -247,7 +236,8 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
       const seenH = new Set();
       mergedHistory.forEach((h) => {
         const hid =
-          h?.id || `${h?.date || ""}-${h?.title || ""}-${h?.summary || ""}-${h?.audioUrl || ""}`;
+          h?.id ||
+          `${h?.date || ""}-${h?.title || ""}-${h?.summary || ""}-${h?.audioUrl || ""}`;
         if (seenH.has(hid)) return;
         seenH.add(hid);
         uniqueHistory.push(h);
@@ -297,69 +287,26 @@ export function usePatients() {
   const [storageLoaded, setStorageLoaded] = useState(false);
   const didAutoSyncRef = useRef(false);
 
-  // Load from storage on mount (localStorage first; tests can use window.storage)
+  // Load patients from storage on mount
   useEffect(() => {
     let mounted = true;
 
-    (async () => {
-      try {
-        const loaded = await loadPatientsFromStorage();
-        if (mounted) {
-          setPatients(loaded);
-          setStorageLoaded(true);
-          setHydrated(true);
-        }
-      } catch (error) {
-        console.error("[usePatients] Failed to load from storage:", error);
-        if (mounted) {
-          setPatients([]);
-          setStorageLoaded(true);
-          setHydrated(true);
-        }
+    async function loadData() {
+      const loaded = await loadPatientsFromStorage();
+      if (mounted) {
+        setPatients(loaded);
+        setStorageLoaded(true);
+        setHydrated(true);
       }
-    })();
+    }
+
+    loadData();
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Keep in sync across tabs/windows (never accept empty overwrite)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    async function onStorage(e) {
-      if (e.key !== STORAGE_KEY && e.key !== BACKUP_KEY) return;
-
-      const loaded = await loadPatientsFromStorage();
-      if (Array.isArray(loaded) && loaded.length > 0) {
-        setPatients(loaded);
-      }
-    }
-
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  // Failsafe: save before tab close/refresh (still guarded from empty overwrite)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    function onBeforeUnload() {
-      // best-effort; do not block unload
-      void savePatientsToStorage(patients, { allowEmpty: false });
-    }
-
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [patients]);
-
-  /**
-   * Single place that:
-   * - Updates state
-   * - Persists to storage
-   * - Prevents accidental empty overwrite
-   */
   const updatePatientsWithSave = useCallback((updater, options = {}) => {
     const { allowEmpty = false, allowEmptyOverwrite = false } = options;
     const allowEmptyFinal = Boolean(allowEmpty || allowEmptyOverwrite);
@@ -368,6 +315,7 @@ export function usePatients() {
       const next = typeof updater === "function" ? updater(prev) : updater;
       const safe = Array.isArray(next) ? next.map(normalizePatient) : [];
 
+      // Protection against empty overwrites
       const prevHasData = Array.isArray(prev) && prev.length > 0;
       const nextIsEmpty = safe.length === 0;
 
@@ -376,8 +324,9 @@ export function usePatients() {
         return prev;
       }
 
-      savePatientsToStorage(safe, { allowEmpty: allowEmptyFinal }).catch((error) => {
-        console.error("[updatePatientsWithSave] Save failed:", error);
+      // Save asynchronously (don't block state update)
+      savePatientsToStorage(safe, { allowEmpty: allowEmptyFinal }).catch((err) => {
+        console.error("[updatePatientsWithSave] Save failed:", err);
       });
 
       return safe;
@@ -462,8 +411,6 @@ export function usePatients() {
       updatePatientsWithSave((prev) => [...prev, newPatient]);
       setSelectedPatientIdNumber(idNumber);
       setEditingPatient(null);
-
-      // Optional sync (never blocks local persistence)
       await syncToMedplum(newPatient);
     },
     [patientIdExists, syncToMedplum, updatePatientsWithSave]
@@ -562,7 +509,6 @@ export function usePatients() {
 
       const patient = patients.find((p) => trimId(p.idNumber) === id);
 
-      // Optional: delete from Medplum if logged in (never clears local list due to auth)
       if (hasMedplumSession() && patient) {
         try {
           let targetId = patient.medplumId || null;
@@ -684,10 +630,7 @@ export function usePatients() {
           const json = JSON.parse(raw);
 
           const isFhirBundle =
-            json &&
-            typeof json === "object" &&
-            json.resourceType === "Bundle" &&
-            Array.isArray(json.entry);
+            json && typeof json === "object" && json.resourceType === "Bundle" && Array.isArray(json.entry);
 
           if (!isFhirBundle) {
             const arr = Array.isArray(json)
@@ -718,12 +661,8 @@ export function usePatients() {
           const resources = json.entry.map((entry) => entry.resource).filter(Boolean);
           const patientResources = resources.filter((res) => res.resourceType === "Patient");
           const observationResources = resources.filter((res) => res.resourceType === "Observation");
-          const diagnosticResources = resources.filter(
-            (res) => res.resourceType === "DiagnosticReport"
-          );
-          const documentReferenceResources = resources.filter(
-            (res) => res.resourceType === "DocumentReference"
-          );
+          const diagnosticResources = resources.filter((res) => res.resourceType === "DiagnosticReport");
+          const documentReferenceResources = resources.filter((res) => res.resourceType === "DocumentReference");
 
           const importedPatients = patientResources.map(fromFhirPatient);
 
@@ -796,8 +735,7 @@ export function usePatients() {
               : "";
 
             const identifiers = Array.isArray(dr.identifier) ? dr.identifier : [];
-            const sessionId =
-              identifiers.find((id) => id?.value)?.value || dr.id || crypto.randomUUID();
+            const sessionId = identifiers.find((id) => id?.value)?.value || dr.id || crypto.randomUUID();
 
             const list = historyByIdNumber.get(idNumber) || [];
             list.push({
@@ -835,9 +773,7 @@ export function usePatients() {
             reportsByIdNumber.set(idNumber, list);
           });
 
-          updatePatientsWithSave((prev) =>
-            mergePatients(prev, importedPatients, historyByIdNumber, reportsByIdNumber)
-          );
+          updatePatientsWithSave((prev) => mergePatients(prev, importedPatients, historyByIdNumber, reportsByIdNumber));
 
           alert("Patients imported successfully!");
         } catch (error) {
@@ -889,7 +825,6 @@ export function usePatients() {
         })
       );
 
-      // Optional sync only
       if (!hasMedplumSession()) return;
       if (!updatedPatientRef) return;
 
@@ -933,7 +868,6 @@ export function usePatients() {
     [updatePatientsWithSave]
   );
 
-  // Optional auto-sync (LOCAL never depends on it)
   const performFullSyncToMedplum = useCallback(
     async ({ silent = false } = {}) => {
       if (!hasMedplumSession()) {
@@ -954,6 +888,9 @@ export function usePatients() {
       }
 
       const updatedPatients = [...patients];
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
 
       for (let i = 0; i < updatedPatients.length; i += 1) {
         const p = updatedPatients[i];
@@ -964,7 +901,11 @@ export function usePatients() {
           const medplumId =
             (await ensureMedplumPatient({ ...p, medplumId: null })) || p.medplumId;
 
-          if (!medplumId) continue;
+          if (!medplumId) {
+            errorCount += 1;
+            errors.push(`${p.firstName} ${p.lastName}: Could not get Medplum ID`);
+            continue;
+          }
 
           updatedPatients[i] = { ...p, medplumId };
           const subjectRef = `Patient/${medplumId}`;
@@ -973,7 +914,11 @@ export function usePatients() {
           for (let j = 0; j < history.length; j += 1) {
             const item = history[j];
             try {
-              const obs = historyItemToObservation({ ...updatedPatients[i], medplumId }, item, j);
+              const obs = historyItemToObservation(
+                { ...updatedPatients[i], medplumId },
+                item,
+                j
+              );
               obs.subject = { reference: subjectRef };
               await medplum.createResource(obs);
 
@@ -1002,23 +947,47 @@ export function usePatients() {
           for (let k = 0; k < reports.length; k += 1) {
             const rep = reports[k];
             try {
-              const dr = reportToDiagnosticReport({ ...updatedPatients[i], medplumId }, rep, k);
+              const dr = reportToDiagnosticReport(
+                { ...updatedPatients[i], medplumId },
+                rep,
+                k
+              );
               dr.subject = { reference: subjectRef };
               await medplum.createResource(dr);
             } catch (error) {
               void error;
             }
           }
-        } catch (error) {
-          void error;
+
+          successCount += 1;
+        } catch (e) {
+          errorCount += 1;
+          errors.push(`${p.firstName} ${p.lastName}: ${e?.message || "Unknown error"}`);
         }
       }
 
-      // Save any medplumId enrichments locally (still local source of truth)
-      const changed = updatedPatients.some(
-        (p, idx) => (patients[idx]?.medplumId || null) !== (p?.medplumId || null)
-      );
-      if (changed) updatePatientsWithSave(updatedPatients);
+      const hasMedplumIdChanges = updatedPatients.some((p, idx) => {
+        const prevId = patients[idx]?.medplumId || null;
+        const nextId = p?.medplumId || null;
+        return prevId !== nextId && nextId;
+      });
+
+      if (hasMedplumIdChanges) {
+        updatePatientsWithSave(updatedPatients);
+      }
+
+      if (!silent) {
+        let message = "Full sync completed!\n\n";
+        message += `Success: ${successCount} patients\n`;
+        if (errorCount > 0) {
+          message += `Failed: ${errorCount} patients\n\n`;
+          message += "Check console for details.";
+          console.error("[performFullSyncToMedplum] Errors:", errors);
+        } else {
+          message += "All data is now in Medplum.";
+        }
+        alert(message);
+      }
     },
     [patients, updatePatientsWithSave]
   );
