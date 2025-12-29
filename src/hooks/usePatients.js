@@ -16,8 +16,10 @@ const STORAGE_KEY = "patients:main";
 const BACKUP_KEY = "patients:backup";
 
 /**
- * SOURCE OF TRUTH: localStorage (local device).
- * Medplum: optional sync only. Never used as a source to build/replace the local list.
+ * IMPORTANT:
+ * - Source of truth (real app): localStorage
+ * - Tests: fall back to window.storage when localStorage is empty/unavailable
+ * - Medplum is optional sync; never used as source-of-truth for the local list
  */
 
 function safeParseArray(raw) {
@@ -25,72 +27,120 @@ function safeParseArray(raw) {
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : null;
-  } catch (error) {
-    void error;
+  } catch {
     return null;
   }
 }
 
-function lsGet(key) {
+// Read: localStorage first, window.storage fallback (tests)
+async function storageGet(key) {
   if (typeof window === "undefined") return null;
+
+  // 1) localStorage first (real app source of truth)
   try {
-    return window.localStorage.getItem(key);
-  } catch (error) {
-    void error;
-    return null;
+    const v = window.localStorage?.getItem?.(key);
+    if (v !== null && v !== undefined) return v;
+  } catch {
+    // ignore
   }
+
+  // 2) fallback: window.storage (tests / special env)
+  try {
+    if (window?.storage?.getItem) return window.storage.getItem(key);
+  } catch {
+    // ignore
+  }
+
+  try {
+    if (window?.storage?.get) {
+      const res = await window.storage.get(key);
+      return res?.value ?? null;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
 }
 
-function lsSet(key, value) {
+// Write: always localStorage, and also window.storage if present (tests assert on it)
+async function storageSet(key, value) {
   if (typeof window === "undefined") return false;
+
+  let wrote = false;
+
   try {
-    window.localStorage.setItem(key, value);
-    return true;
-  } catch (error) {
-    void error;
-    return false;
+    window.localStorage?.setItem?.(key, value);
+    wrote = true;
+  } catch {
+    // ignore
   }
+
+  try {
+    if (window?.storage?.setItem) {
+      window.storage.setItem(key, value);
+      wrote = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    if (window?.storage?.set) {
+      await window.storage.set(key, value);
+      wrote = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  return wrote;
 }
 
-// === LOAD (LOCAL ONLY) ===
-function loadPatientsFromLocalStorage() {
-  const mainRaw = lsGet(STORAGE_KEY);
+// === LOAD PATIENTS (localStorage first, window.storage fallback for tests) ===
+async function loadPatientsFromStorage() {
+  // Try main first
+  const mainRaw = await storageGet(STORAGE_KEY);
   const mainParsed = safeParseArray(mainRaw);
   if (mainParsed && mainParsed.length > 0) {
     return mainParsed.map(normalizePatient);
   }
 
-  const backupRaw = lsGet(BACKUP_KEY);
+  // Main is empty OR corrupted -> try backup
+  const backupRaw = await storageGet(BACKUP_KEY);
   const backupParsed = safeParseArray(backupRaw);
   if (backupParsed && backupParsed.length > 0) {
     const safe = backupParsed.map(normalizePatient);
     const json = JSON.stringify(safe);
-    lsSet(STORAGE_KEY, json);
-    lsSet(BACKUP_KEY, json);
+
+    // Repair main and keep backup in sync
+    await storageSet(STORAGE_KEY, json);
+    await storageSet(BACKUP_KEY, json);
+
     return safe;
   }
 
   return [];
 }
 
-// === SAVE (LOCAL ONLY) ===
-function savePatientsToLocalStorage(
+// === SAVE PATIENTS (writes to localStorage, mirrors to window.storage if present) ===
+async function savePatientsToStorage(
   patients,
   { allowEmpty = false, allowEmptyOverwrite = false } = {}
 ) {
   const allowEmptyFinal = Boolean(allowEmpty || allowEmptyOverwrite);
   const safe = Array.isArray(patients) ? patients.map(normalizePatient) : [];
 
-  // Hard protection: never overwrite non-empty storage with empty array unless explicitly allowed
+  // Prevent overwriting existing non-empty storage with empty array (unless explicitly allowed)
   if (!allowEmptyFinal && safe.length === 0) {
-    const existingRaw = lsGet(STORAGE_KEY);
+    const existingRaw = await storageGet(STORAGE_KEY);
     const existing = safeParseArray(existingRaw);
     if (existing && existing.length > 0) return;
   }
 
   const json = JSON.stringify(safe);
-  lsSet(STORAGE_KEY, json);
-  lsSet(BACKUP_KEY, json);
+  await storageSet(STORAGE_KEY, json);
+  await storageSet(BACKUP_KEY, json);
 }
 
 function cleanUpdate(obj) {
@@ -197,8 +247,7 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
       const seenH = new Set();
       mergedHistory.forEach((h) => {
         const hid =
-          h?.id ||
-          `${h?.date || ""}-${h?.title || ""}-${h?.summary || ""}-${h?.audioUrl || ""}`;
+          h?.id || `${h?.date || ""}-${h?.title || ""}-${h?.summary || ""}-${h?.audioUrl || ""}`;
         if (seenH.has(hid)) return;
         seenH.add(hid);
         uniqueHistory.push(h);
@@ -248,25 +297,27 @@ export function usePatients() {
   const [storageLoaded, setStorageLoaded] = useState(false);
   const didAutoSyncRef = useRef(false);
 
-  // Load from localStorage once on mount
+  // Load from storage on mount (localStorage first; tests can use window.storage)
   useEffect(() => {
     let mounted = true;
 
-    try {
-      const loaded = loadPatientsFromLocalStorage();
-      if (mounted) {
-        setPatients(loaded);
-        setStorageLoaded(true);
-        setHydrated(true);
+    (async () => {
+      try {
+        const loaded = await loadPatientsFromStorage();
+        if (mounted) {
+          setPatients(loaded);
+          setStorageLoaded(true);
+          setHydrated(true);
+        }
+      } catch (error) {
+        console.error("[usePatients] Failed to load from storage:", error);
+        if (mounted) {
+          setPatients([]);
+          setStorageLoaded(true);
+          setHydrated(true);
+        }
       }
-    } catch (error) {
-      console.error("[usePatients] Failed to load from localStorage:", error);
-      if (mounted) {
-        setPatients([]);
-        setStorageLoaded(true);
-        setHydrated(true);
-      }
-    }
+    })();
 
     return () => {
       mounted = false;
@@ -277,10 +328,10 @@ export function usePatients() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    function onStorage(e) {
+    async function onStorage(e) {
       if (e.key !== STORAGE_KEY && e.key !== BACKUP_KEY) return;
 
-      const loaded = loadPatientsFromLocalStorage();
+      const loaded = await loadPatientsFromStorage();
       if (Array.isArray(loaded) && loaded.length > 0) {
         setPatients(loaded);
       }
@@ -295,18 +346,20 @@ export function usePatients() {
     if (typeof window === "undefined") return;
 
     function onBeforeUnload() {
-      try {
-        savePatientsToLocalStorage(patients, { allowEmpty: false });
-      } catch {
-        // ignore
-      }
+      // best-effort; do not block unload
+      void savePatientsToStorage(patients, { allowEmpty: false });
     }
 
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [patients]);
 
-  // Single update path: update state + persist locally (guarded)
+  /**
+   * Single place that:
+   * - Updates state
+   * - Persists to storage
+   * - Prevents accidental empty overwrite
+   */
   const updatePatientsWithSave = useCallback((updater, options = {}) => {
     const { allowEmpty = false, allowEmptyOverwrite = false } = options;
     const allowEmptyFinal = Boolean(allowEmpty || allowEmptyOverwrite);
@@ -323,11 +376,9 @@ export function usePatients() {
         return prev;
       }
 
-      try {
-        savePatientsToLocalStorage(safe, { allowEmpty: allowEmptyFinal });
-      } catch (error) {
+      savePatientsToStorage(safe, { allowEmpty: allowEmptyFinal }).catch((error) => {
         console.error("[updatePatientsWithSave] Save failed:", error);
-      }
+      });
 
       return safe;
     });
@@ -667,8 +718,12 @@ export function usePatients() {
           const resources = json.entry.map((entry) => entry.resource).filter(Boolean);
           const patientResources = resources.filter((res) => res.resourceType === "Patient");
           const observationResources = resources.filter((res) => res.resourceType === "Observation");
-          const diagnosticResources = resources.filter((res) => res.resourceType === "DiagnosticReport");
-          const documentReferenceResources = resources.filter((res) => res.resourceType === "DocumentReference");
+          const diagnosticResources = resources.filter(
+            (res) => res.resourceType === "DiagnosticReport"
+          );
+          const documentReferenceResources = resources.filter(
+            (res) => res.resourceType === "DocumentReference"
+          );
 
           const importedPatients = patientResources.map(fromFhirPatient);
 
@@ -741,7 +796,8 @@ export function usePatients() {
               : "";
 
             const identifiers = Array.isArray(dr.identifier) ? dr.identifier : [];
-            const sessionId = identifiers.find((id) => id?.value)?.value || dr.id || crypto.randomUUID();
+            const sessionId =
+              identifiers.find((id) => id?.value)?.value || dr.id || crypto.randomUUID();
 
             const list = historyByIdNumber.get(idNumber) || [];
             list.push({
@@ -877,6 +933,7 @@ export function usePatients() {
     [updatePatientsWithSave]
   );
 
+  // Optional auto-sync (LOCAL never depends on it)
   const performFullSyncToMedplum = useCallback(
     async ({ silent = false } = {}) => {
       if (!hasMedplumSession()) {
@@ -957,6 +1014,7 @@ export function usePatients() {
         }
       }
 
+      // Save any medplumId enrichments locally (still local source of truth)
       const changed = updatedPatients.some(
         (p, idx) => (patients[idx]?.medplumId || null) !== (p?.medplumId || null)
       );
