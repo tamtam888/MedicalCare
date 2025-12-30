@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import "./PatientForm.css";
 
 const defaultValues = {
@@ -19,33 +19,67 @@ const defaultValues = {
 function toDateInputValue(d) {
   if (!d) return "";
   if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
 }
 
-function capitalizeWords(input) {
-  return String(input || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
-    .join(" ");
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v === undefined || v === null) continue;
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t !== "") return t;
+      continue;
+    }
+    return v;
+  }
+  return "";
 }
 
 function normalizeInitialValues(initialValues) {
   if (!initialValues) return { ...defaultValues };
 
-  const idNumber = initialValues.idNumber || initialValues.id || "";
+  const addr = Array.isArray(initialValues.address)
+    ? initialValues.address[0]
+    : initialValues.address;
 
-  const dob = toDateInputValue(
-    initialValues.dob || initialValues.dateOfBirth || initialValues.birthDate
+  const idNumber = firstNonEmpty(initialValues.idNumber, initialValues.id, "");
+
+  const dobRaw = firstNonEmpty(
+    initialValues.dob,
+    initialValues.dateOfBirth,
+    initialValues.birthDate,
+    initialValues.birthDateTime,
+    ""
+  );
+  const dob = toDateInputValue(dobRaw);
+
+  const addrLine0 = Array.isArray(addr?.line) ? addr.line[0] : undefined;
+
+  const street = firstNonEmpty(
+    initialValues.street,
+    initialValues.address,
+    addr?.street,
+    addr?.line1,
+    addrLine0,
+    ""
   );
 
-  const status =
-    initialValues.status ||
-    initialValues.clinicalStatus ||
-    defaultValues.status;
+  const city = firstNonEmpty(initialValues.city, addr?.city, addr?.town, "");
+  const zipCode = firstNonEmpty(
+    initialValues.zipCode,
+    addr?.zipCode,
+    addr?.postalCode,
+    ""
+  );
+
+  const status = firstNonEmpty(
+    initialValues.status,
+    initialValues.clinicalStatus,
+    defaultValues.status
+  );
 
   const conditions = Array.isArray(initialValues.conditions)
     ? initialValues.conditions.join(", ")
@@ -56,9 +90,11 @@ function normalizeInitialValues(initialValues) {
     ...initialValues,
     idNumber,
     dob,
+    street,
+    city,
+    zipCode,
     status,
     conditions,
-    street: initialValues.street || initialValues.address || "",
   };
 }
 
@@ -69,10 +105,13 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
   const [errors, setErrors] = useState({});
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  useEffect(() => {
-    setValues(normalizeInitialValues(initialValues));
-    setErrors({});
-  }, [initialValues]);
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setValues((prev) => ({
+      ...prev,
+      [name]: name === "dob" ? toDateInputValue(value) : value,
+    }));
+  }
 
   function validate(v) {
     const e = {};
@@ -108,26 +147,6 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
     return Object.keys(e).length === 0;
   }
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-
-    setValues((prev) => {
-      const next = { ...prev };
-
-      if (name === "firstName" || name === "lastName") {
-        next[name] = capitalizeWords(value);
-      } else {
-        next[name] = value;
-      }
-
-      if (name === "dob") {
-        next.dob = toDateInputValue(value);
-      }
-
-      return next;
-    });
-  }
-
   function handleSubmit(e) {
     e.preventDefault();
     if (!validate(values)) return;
@@ -150,9 +169,9 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
       phone: (values.phone || "").trim(),
       email: (values.email || "").trim(),
       street,
+      address: street,
       city,
       zipCode,
-      address: street,
       status: values.status,
       clinicalStatus: values.status,
       dob: toDateInputValue(values.dob),
@@ -188,11 +207,9 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
           <div className="form-error">Please fix the highlighted fields.</div>
         )}
 
-        <form className="patient-form" onSubmit={handleSubmit} noValidate>
+        <form className="patient-form" onSubmit={handleSubmit}>
           <div className="form-field">
-            <label htmlFor="firstName">
-              First name <span className="required-asterisk">*</span>
-            </label>
+            <label htmlFor="firstName">First name</label>
             <input
               id="firstName"
               name="firstName"
@@ -203,9 +220,7 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
           </div>
 
           <div className="form-field">
-            <label htmlFor="lastName">
-              Last name <span className="required-asterisk">*</span>
-            </label>
+            <label htmlFor="lastName">Last name</label>
             <input
               id="lastName"
               name="lastName"
@@ -216,9 +231,7 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
           </div>
 
           <div className="form-field">
-            <label htmlFor="idNumber">
-              ID number <span className="required-asterisk">*</span>
-            </label>
+            <label htmlFor="idNumber">ID number</label>
             <input
               id="idNumber"
               name="idNumber"
@@ -255,9 +268,7 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
           </div>
 
           <div className="form-field">
-            <label htmlFor="phone">
-              Phone number <span className="required-asterisk">*</span>
-            </label>
+            <label htmlFor="phone">Phone</label>
             <input
               id="phone"
               name="phone"
@@ -279,72 +290,70 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
           </div>
 
           <div className="form-field">
-            <label htmlFor="street">Address</label>
+            <label htmlFor="street">Street</label>
             <input
               id="street"
               name="street"
               type="text"
               value={values.street}
               onChange={handleChange}
-              placeholder="Street and number"
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-field">
-              <label htmlFor="city">City</label>
-              <input
-                id="city"
-                name="city"
-                type="text"
-                value={values.city}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="zipCode">Zip code</label>
-              <input
-                id="zipCode"
-                name="zipCode"
-                type="text"
-                value={values.zipCode}
-                onChange={handleChange}
-              />
-            </div>
+          <div className="form-field">
+            <label htmlFor="city">City</label>
+            <input
+              id="city"
+              name="city"
+              type="text"
+              value={values.city}
+              onChange={handleChange}
+            />
           </div>
 
-          <div className="form-row">
-            <div className="form-field">
-              <label htmlFor="conditions">Medical issues</label>
-              <textarea
-                id="conditions"
-                name="conditions"
-                rows={3}
-                value={values.conditions}
-                onChange={handleChange}
-                placeholder="Chronic conditions, injuries, risk factors"
-              />
-            </div>
+          <div className="form-field">
+            <label htmlFor="zipCode">Zip code</label>
+            <input
+              id="zipCode"
+              name="zipCode"
+              type="text"
+              value={values.zipCode}
+              onChange={handleChange}
+            />
+          </div>
 
-            <div className="form-field">
-              <label htmlFor="status">Clinical status</label>
-              <select
-                id="status"
-                name="status"
-                value={values.status}
-                onChange={handleChange}
-              >
-                <option value="Active">Active</option>
-                <option value="Stable">Stable</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Disabled">Disabled</option>
-                <option value="Not Active">Not Active</option>
-              </select>
-            </div>
+          <div className="form-field">
+            <label htmlFor="status">Status</label>
+            <select
+              id="status"
+              name="status"
+              value={values.status}
+              onChange={handleChange}
+            >
+              <option value="Active">Active</option>
+              <option value="Stable">Stable</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Disabled">Disabled</option>
+              <option value="Not Active">Not Active</option>
+            </select>
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="conditions">Conditions</label>
+            <input
+              id="conditions"
+              name="conditions"
+              type="text"
+              value={values.conditions}
+              onChange={handleChange}
+              placeholder="Comma-separated"
+            />
           </div>
 
           <div className="form-actions">
+            <button type="button" className="form-cancel-btn" onClick={onClose}>
+              Cancel
+            </button>
             <button type="submit" className="form-submit-btn">
               {initialValues ? "Update patient" : "Create patient"}
             </button>
