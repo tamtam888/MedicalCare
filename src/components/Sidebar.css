@@ -24,7 +24,7 @@
 .sidebar-brand {
   display: flex;
   align-items: center;
-  padding: 0 0.55rem 1.6rem; /* adjusted to align content slightly left */
+  padding: 0 0.55rem 1.6rem; 
 }
 
 .sidebar-brand-logo {
