@@ -1,0 +1,170 @@
+/* Container inside the patient card */
+.reports-container {
+  margin-top: 1.25rem; /* space below PatientHistory */
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Row with upload button and error text */
+.reports-upload-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Upload label wraps the hidden input */
+.file-upload-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Pretty upload button */
+.file-upload-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background-color: #f9fafb;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #111827;
+  box-shadow: 0 2px 5px rgba(148, 163, 184, 0.35);
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.08s ease;
+}
+
+.file-upload-button:hover {
+  background-color: #eef2ff;
+  box-shadow: 0 3px 8px rgba(129, 140, 248, 0.4);
+  transform: translateY(-1px);
+}
+
+.file-upload-icon {
+  font-size: 1rem;
+}
+
+.file-upload-text {
+  line-height: 1;
+}
+
+/* Hide the native file input */
+.file-upload-input {
+  display: none;
+}
+
+/* Error text */
+.error-text {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+/* Empty state */
+.empty-state {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.88rem;
+  color: #6b7280;
+}
+
+/* Reports list */
+.report-list {
+  list-style: none;
+  margin: 0.5rem 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Single report item */
+.report-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+/* Left side: icon + name + meta */
+.report-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.report-icon {
+  font-size: 1.2rem;
+}
+
+.report-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.report-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.report-meta {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Right side: actions */
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Make sure buttons look compact here */
+.report-actions .secondary-button,
+.report-actions .danger-button {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+}
+
+/* Responsive: stack actions under main on small screens */
+@media (max-width: 600px) {
+  .report-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .report-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .report-actions .secondary-button,
+  .report-actions .danger-button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* RTL support */
+[dir="rtl"] .report-item {
+  text-align: right;
+}
+
+[dir="rtl"] .report-main {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .report-actions {
+  flex-direction: row-reverse;
+}

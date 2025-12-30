@@ -1,125 +1,235 @@
-/* כרטיס טופס בסיסי */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-container {
+  width: 100%;
+  max-width: 620px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 25px 45px rgba(15, 23, 42, 0.18);
+  padding: 1.5rem 1.7rem 2rem;
+  animation: fadeIn 0.15s ease;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  line-height: 1;
+  color: #6b7280;
+  transition: color 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  color: #111827;
+}
+
 .patient-form {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
   background-color: #ffffff;
-  padding: 1rem 0;
+  padding: 0.25rem 0;
 }
 
-/* הודעת שגיאה בראש הטופס */
 .form-error {
-  background-color: #ffe5e5;
-  border: 1px solid #ffb2b2;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: 10px;
   color: #b91c1c;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.9rem;
 }
 
-/* עטיפת כל שדה */
 .form-field {
   display: flex;
   flex-direction: column;
 }
 
-/* תוויות */
 .form-field label {
   font-weight: 600;
   margin-bottom: 0.25rem;
-  font-size: 0.95rem;
-  color: #333;
+  font-size: 0.93rem;
+  color: #111827;
 }
 
-/* כוכבית חובה */
-.required-asterisk {
-  color: #dc2626;
-  font-weight: bold;
-  margin-left: 3px;
-  font-size: 1rem;
-  vertical-align: middle;
-}
-
-/* שדות קלט */
 .form-field input,
 .form-field select,
 .form-field textarea {
   width: 100%;
-  padding: 0.55rem 0.75rem;
+  padding: 0.55rem 0.8rem;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
   box-sizing: border-box;
-  background-color: #fcfcfc;
-  color: #111;
+  background-color: #f9fafb;
+  color: #111827;
+  transition:
+    border-color 0.1s ease,
+    box-shadow 0.1s ease,
+    background-color 0.1s ease;
 }
 
-/* פוקוס */
 .form-field input:focus,
 .form-field select:focus,
 .form-field textarea:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  border-color: #a855f7;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+  background-color: #ffffff;
 }
 
-/* שדות רחבים */
 .form-full-width {
   width: 100%;
 }
 
-/* טקסטאראה */
-.form-field textarea {
-  min-height: 90px;
-  resize: vertical;
+.form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-/* אזור כפתורים */
+.form-row .form-field {
+  flex: 1 1 0;
+  min-width: 200px;
+}
+
 .form-actions {
   display: flex;
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
 
-/* כפתור Cancel */
 .form-cancel-btn {
-  background-color: #e5e7eb;
+  background-color: #f3f4f6;
   color: #111827;
-  border: none;
-  padding: 0.45rem 0.9rem;
-  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 500;
+  transition:
+    background-color 0.1s ease,
+    border-color 0.1s ease,
+    transform 0.05s ease;
 }
 
-/* כפתור Create/Update בולט יותר */
+.form-cancel-btn:hover {
+  background-color: #e5e7eb;
+  border-color: #d4d4d8;
+  transform: translateY(-1px);
+}
+
 .form-submit-btn {
-  background-color: #2563eb;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
   color: #ffffff;
   border: none;
   padding: 0.55rem 1.3rem;
-  border-radius: 6px;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
-  transition: transform 0.05s ease, box-shadow 0.05s ease, filter 0.1s ease;
+  box-shadow: 0 6px 14px rgba(99, 102, 241, 0.35);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    opacity 0.1s ease;
 }
 
-/* hover וקליק */
 .form-submit-btn:hover {
-  filter: brightness(1.05);
+  opacity: 0.97;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.4);
 }
 
 .form-submit-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.4);
 }
 
-/* רספונסיביות */
 @media (max-width: 600px) {
-  .patient-form {
-    padding: 0;
+  .modal-container {
+    max-width: 95%;
+    padding: 1.2rem;
   }
+
+  .patient-form {
+    padding: 0.75rem 0;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row .form-field {
+    min-width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-submit-btn,
+  .form-cancel-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
+.required-marker {
+  color: #dc2626;
+  margin-left: 0.15rem;
+}
+
+.form-field.has-error input,
+.form-field.has-error select {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.25);
+}
+
+.field-error {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #b91c1c;
 }
