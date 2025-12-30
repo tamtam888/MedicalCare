@@ -65,6 +65,28 @@ function InlineEditable({
   );
 }
 
+function pickFirstAddress(address) {
+  if (!address) return null;
+  if (Array.isArray(address)) return address[0] ?? null;
+  if (typeof address === "object") return address;
+  return null;
+}
+
+function buildAddressString(patient) {
+  const addrObj = pickFirstAddress(patient?.address);
+  const street =
+    patient?.street ||
+    addrObj?.street ||
+    addrObj?.line1 ||
+    (Array.isArray(addrObj?.line) ? addrObj.line[0] : "") ||
+    "";
+
+  const city = patient?.city || addrObj?.city || addrObj?.town || "";
+  const country = patient?.country || addrObj?.country || "";
+
+  return [street, city, country].filter(Boolean).join(", ");
+}
+
 function PatientDetailsPage({
   patients,
   selectedPatient,
@@ -119,6 +141,13 @@ function PatientDetailsPage({
       .filter(Boolean)
       .join(" ");
 
+  const updatePatient = (nextPatient) => {
+    setEditablePatient(nextPatient);
+    if (typeof onUpdatePatient === "function") {
+      onUpdatePatient(nextPatient);
+    }
+  };
+
   const updateField = (field, value) => {
     setEditablePatient((prev) => {
       if (!prev) return prev;
@@ -126,6 +155,43 @@ function PatientDetailsPage({
       if (typeof onUpdatePatient === "function") {
         onUpdatePatient(updated);
       }
+      return updated;
+    });
+  };
+
+  const updateAddressFromInput = (input) => {
+    const street = (input || "").trim();
+
+    setEditablePatient((prev) => {
+      if (!prev) return prev;
+
+      const prevAddrObj = pickFirstAddress(prev.address) || {};
+      const city = prev.city || prevAddrObj.city || prevAddrObj.town || "";
+      const zipCode =
+        prev.zipCode ||
+        prevAddrObj.zipCode ||
+        prevAddrObj.postalCode ||
+        "";
+
+      const addressObj = {
+        ...prevAddrObj,
+        street,
+        city,
+        postalCode: zipCode,
+      };
+
+      const updated = {
+        ...prev,
+        street,
+        city,
+        zipCode,
+        address: [addressObj],
+      };
+
+      if (typeof onUpdatePatient === "function") {
+        onUpdatePatient(updated);
+      }
+
       return updated;
     });
   };
@@ -222,16 +288,10 @@ function PatientDetailsPage({
     }
   };
 
-  const fullAddress =
-    editablePatient.address ||
-    [editablePatient.street, editablePatient.city, editablePatient.country]
-      .filter(Boolean)
-      .join(", ") ||
-    "";
+  const fullAddress = buildAddressString(editablePatient);
 
   return (
     <div className="app-container patient-details-page">
-      {/* HEADER */}
       <div className={`patient-header-wrapper ${headerStatusClass}`}>
         <div className="patient-header-left">
           <div className={`patient-avatar-details ${genderClass}`}>
@@ -289,7 +349,6 @@ function PatientDetailsPage({
         </div>
       </div>
 
-      {/* PATIENT DETAILS CARD */}
       <section className="patient-card">
         <h2 className="section-title">Patient details</h2>
 
@@ -320,7 +379,7 @@ function PatientDetailsPage({
             <InlineEditable
               value={fullAddress}
               placeholder="Street, city, country"
-              onChange={(val) => updateField("address", val)}
+              onChange={updateAddressFromInput}
               className="details-value"
             />
           </div>
@@ -357,7 +416,7 @@ function PatientDetailsPage({
           <h3 className="section-subtitle">Notes</h3>
           <InlineEditable
             value={editablePatient.notes}
-            placeholder="Write your notes here..."
+            placeholder="Write your notes here."
             onChange={(val) => updateField("notes", val)}
             multiline
             className="details-box"
@@ -365,7 +424,6 @@ function PatientDetailsPage({
         </div>
       </section>
 
-      {/* TRANSCRIPTION CARD */}
       <section className="patient-card">
         <h2 className="section-title">Treatment transcription</h2>
         <RecordAudio
@@ -374,7 +432,6 @@ function PatientDetailsPage({
         />
       </section>
 
-      {/* HISTORY CARD */}
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
         <PatientHistory patient={editablePatient} />
