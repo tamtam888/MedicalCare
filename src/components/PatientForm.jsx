@@ -58,6 +58,7 @@ function normalizeInitialValues(initialValues) {
     dob,
     status,
     conditions,
+    street: initialValues.street || initialValues.address || "",
   };
 }
 
@@ -134,6 +135,10 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
     const base = initialValues ? { ...initialValues } : {};
     const trimmedIdNumber = (values.idNumber || "").trim();
 
+    const street = (values.street || "").trim();
+    const city = (values.city || "").trim();
+    const zipCode = (values.zipCode || "").trim();
+
     const prepared = {
       ...base,
       ...values,
@@ -144,9 +149,10 @@ function PatientFormInner({ onClose, onSubmit, initialValues }) {
       lastName: (values.lastName || "").trim(),
       phone: (values.phone || "").trim(),
       email: (values.email || "").trim(),
-      street: (values.street || "").trim(),
-      city: (values.city || "").trim(),
-      zipCode: (values.zipCode || "").trim(),
+      street,
+      city,
+      zipCode,
+      address: street,
       status: values.status,
       clinicalStatus: values.status,
       dob: toDateInputValue(values.dob),
