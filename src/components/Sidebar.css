@@ -9,6 +9,7 @@
   flex-direction: column;
   background: linear-gradient(180deg, #ece2ff, #dcc7ff);
   border-right: 1px solid #bca2ff;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 .sidebar-ltr {
@@ -19,10 +20,11 @@
   direction: rtl;
 }
 
+/* Brand (logo + title) */
 .sidebar-brand {
   display: flex;
   align-items: center;
-  padding: 0 1.25rem 1.6rem;
+  padding: 0 0.55rem 1.6rem; /* adjusted to align content slightly left */
 }
 
 .sidebar-brand-logo {
@@ -63,6 +65,7 @@
   color: #6c4a9c;
 }
 
+/* Navigation */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -130,6 +133,7 @@
   opacity: 0.85;
 }
 
+/* Dark mode */
 @media (prefers-color-scheme: dark) {
   .app-sidebar {
     background: linear-gradient(180deg, #1b1333, #0d071b);
@@ -168,6 +172,7 @@
   }
 }
 
+/* Mobile */
 @media (max-width: 768px) {
   .app-sidebar {
     width: 100%;
@@ -195,7 +200,4 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
   }
-}
-.app-sidebar {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
