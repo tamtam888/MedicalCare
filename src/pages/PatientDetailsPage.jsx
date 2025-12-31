@@ -17,17 +17,13 @@ function InlineEditable({
   const [draft, setDraft] = useState(value || "");
 
   useEffect(() => {
-    if (!editing) {
-      setDraft(value || "");
-    }
+    if (!editing) setDraft(value || "");
   }, [value, editing]);
 
   const finish = () => {
     setEditing(false);
     const next = draft ?? "";
-    if (next !== (value ?? "")) {
-      onChange(next);
-    }
+    if (next !== (value ?? "")) onChange(next);
   };
 
   if (!editing) {
@@ -89,13 +85,11 @@ function buildAddressString(patient) {
 
 function PatientDetailsPage({
   patients,
-  selectedPatient,
   selectedPatientFullName,
   handleSelectPatient,
   handleAddReport,
   handleDeleteReport,
   handleSaveTranscription,
-  handleEditPatient,
   onUpdatePatient,
   handleExportPatients,
   handleImportPatients,
@@ -103,15 +97,12 @@ function PatientDetailsPage({
   const { idNumber } = useParams();
   const navigate = useNavigate();
 
-  const patient = useMemo(
-    () =>
-      patients.find(
-        (p) =>
-          p.idNumber &&
-          p.idNumber.toString().trim() === String(idNumber).trim()
-      ) || null,
-    [patients, idNumber]
-  );
+  const patient = useMemo(() => {
+    const idTrim = String(idNumber ?? "").trim();
+    return (
+      patients.find((p) => String(p?.idNumber ?? "").trim() === idTrim) || null
+    );
+  }, [patients, idNumber]);
 
   const [editablePatient, setEditablePatient] = useState(patient || null);
 
@@ -141,20 +132,11 @@ function PatientDetailsPage({
       .filter(Boolean)
       .join(" ");
 
-  const updatePatient = (nextPatient) => {
-    setEditablePatient(nextPatient);
-    if (typeof onUpdatePatient === "function") {
-      onUpdatePatient(nextPatient);
-    }
-  };
-
   const updateField = (field, value) => {
     setEditablePatient((prev) => {
       if (!prev) return prev;
       const updated = { ...prev, [field]: value };
-      if (typeof onUpdatePatient === "function") {
-        onUpdatePatient(updated);
-      }
+      onUpdatePatient?.(updated);
       return updated;
     });
   };
@@ -188,10 +170,19 @@ function PatientDetailsPage({
         address: [addressObj],
       };
 
-      if (typeof onUpdatePatient === "function") {
-        onUpdatePatient(updated);
-      }
+      onUpdatePatient?.(updated);
+      return updated;
+    });
+  };
 
+  const updateHistory = (nextHistory) => {
+    setEditablePatient((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        history: Array.isArray(nextHistory) ? nextHistory : [],
+      };
+      onUpdatePatient?.(updated);
       return updated;
     });
   };
@@ -434,7 +425,11 @@ function PatientDetailsPage({
 
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
-        <PatientHistory patient={editablePatient} />
+        <PatientHistory
+          patient={editablePatient}
+          history={editablePatient.history}
+          onChangeHistory={updateHistory}
+        />
         <AttachReports
           patientId={editablePatient.idNumber}
           existingReports={editablePatient.reports || []}
