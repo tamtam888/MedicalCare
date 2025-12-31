@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useMemo, useRef, useState } from "react";
+=======
+import { useMemo, useState, useEffect } from "react";
+>>>>>>> refactor-ui-cleanup
 import { useParams, useNavigate } from "react-router-dom";
 import PatientHistory from "../components/PatientHistory";
 import AttachReports from "../components/AttachReports";
@@ -14,24 +18,43 @@ function InlineEditable({
   className = "",
 }) {
   const [editing, setEditing] = useState(false);
+<<<<<<< HEAD
   const [draft, setDraft] = useState("");
 
   const startEditing = () => {
     setDraft(value ?? "");
     setEditing(true);
   };
+=======
+  const [draft, setDraft] = useState(value || "");
+
+  useEffect(() => {
+    if (!editing) setDraft(value || "");
+  }, [value, editing]);
+>>>>>>> refactor-ui-cleanup
 
   const finish = () => {
     setEditing(false);
     const next = draft ?? "";
+<<<<<<< HEAD
     if (next !== (value ?? "")) {
       onChange(next);
     }
+=======
+    if (next !== (value ?? "")) onChange(next);
+>>>>>>> refactor-ui-cleanup
   };
 
   if (!editing) {
     return (
+<<<<<<< HEAD
       <span className={`editable-field ${className}`} onClick={startEditing}>
+=======
+      <span
+        className={`editable-field ${className}`}
+        onClick={() => setEditing(true)}
+      >
+>>>>>>> refactor-ui-cleanup
         {value && String(value).trim().length > 0 ? value : placeholder}
       </span>
     );
@@ -61,6 +84,31 @@ function InlineEditable({
   );
 }
 
+<<<<<<< HEAD
+=======
+function pickFirstAddress(address) {
+  if (!address) return null;
+  if (Array.isArray(address)) return address[0] ?? null;
+  if (typeof address === "object") return address;
+  return null;
+}
+
+function buildAddressString(patient) {
+  const addrObj = pickFirstAddress(patient?.address);
+  const street =
+    patient?.street ||
+    addrObj?.street ||
+    addrObj?.line1 ||
+    (Array.isArray(addrObj?.line) ? addrObj.line[0] : "") ||
+    "";
+
+  const city = patient?.city || addrObj?.city || addrObj?.town || "";
+  const country = patient?.country || addrObj?.country || "";
+
+  return [street, city, country].filter(Boolean).join(", ");
+}
+
+>>>>>>> refactor-ui-cleanup
 function PatientDetailsPage({
   patients,
   selectedPatientFullName,
@@ -75,6 +123,7 @@ function PatientDetailsPage({
   const { idNumber } = useParams();
   const navigate = useNavigate();
 
+<<<<<<< HEAD
   const patient = useMemo(
     () =>
       patients.find(
@@ -158,6 +207,20 @@ function PatientDetailsPage({
       event.target.value = "";
     }
   };
+=======
+  const patient = useMemo(() => {
+    const idTrim = String(idNumber ?? "").trim();
+    return (
+      patients.find((p) => String(p?.idNumber ?? "").trim() === idTrim) || null
+    );
+  }, [patients, idNumber]);
+
+  const [editablePatient, setEditablePatient] = useState(patient || null);
+
+  useEffect(() => {
+    setEditablePatient(patient || null);
+  }, [patient]);
+>>>>>>> refactor-ui-cleanup
 
   if (!patient || !editablePatient) {
     return (
@@ -181,6 +244,68 @@ function PatientDetailsPage({
       .filter(Boolean)
       .join(" ");
 
+<<<<<<< HEAD
+=======
+  const updateField = (field, value) => {
+    setEditablePatient((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, [field]: value };
+      onUpdatePatient?.(updated);
+      return updated;
+    });
+  };
+
+  const updateAddressFromInput = (input) => {
+    const street = (input || "").trim();
+
+    setEditablePatient((prev) => {
+      if (!prev) return prev;
+
+      const prevAddrObj = pickFirstAddress(prev.address) || {};
+      const city = prev.city || prevAddrObj.city || prevAddrObj.town || "";
+      const zipCode =
+        prev.zipCode ||
+        prevAddrObj.zipCode ||
+        prevAddrObj.postalCode ||
+        "";
+
+      const addressObj = {
+        ...prevAddrObj,
+        street,
+        city,
+        postalCode: zipCode,
+      };
+
+      const updated = {
+        ...prev,
+        street,
+        city,
+        zipCode,
+        address: [addressObj],
+      };
+
+      onUpdatePatient?.(updated);
+      return updated;
+    });
+  };
+
+  const updateHistory = (nextHistory) => {
+    setEditablePatient((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        history: Array.isArray(nextHistory) ? nextHistory : [],
+      };
+      onUpdatePatient?.(updated);
+      return updated;
+    });
+  };
+
+  const handleClose = () => {
+    navigate("/patients");
+  };
+
+>>>>>>> refactor-ui-cleanup
   const clinicalStatus = (editablePatient.clinicalStatus || "")
     .toString()
     .trim()
@@ -228,12 +353,57 @@ function PatientDetailsPage({
       ? "avatar-male"
       : "avatar-other";
 
+<<<<<<< HEAD
   const fullAddress =
     editablePatient.address ||
     [editablePatient.street, editablePatient.city, editablePatient.country]
       .filter(Boolean)
       .join(", ") ||
     "";
+=======
+  const handleSaveTranscriptionForPatient = (text, audioUrl) => {
+    const targetId = editablePatient.idNumber;
+    const cleanText = text?.trim() || "";
+    const hasAudio = Boolean(audioUrl);
+
+    if (!targetId) return;
+    if (!cleanText && !hasAudio) return;
+
+    if (typeof handleSelectPatient === "function") {
+      handleSelectPatient(targetId);
+    }
+
+    handleSaveTranscription(targetId, cleanText, audioUrl || "");
+  };
+
+  const handleAddReportForPatient = (meta) => {
+    if (typeof handleSelectPatient === "function") {
+      handleSelectPatient(editablePatient.idNumber);
+    }
+    handleAddReport(editablePatient.idNumber, meta);
+  };
+
+  const handleExportClick = () => {
+    if (typeof handleExportPatients === "function") {
+      handleExportPatients();
+    } else {
+      alert("Export is not configured yet in the app.");
+    }
+  };
+
+  const handleImportChange = (event) => {
+    if (typeof handleImportPatients === "function") {
+      handleImportPatients(event);
+    } else {
+      alert("Import is not configured yet in the app.");
+    }
+    if (event?.target) {
+      event.target.value = "";
+    }
+  };
+
+  const fullAddress = buildAddressString(editablePatient);
+>>>>>>> refactor-ui-cleanup
 
   return (
     <div className="app-container patient-details-page">
@@ -324,7 +494,11 @@ function PatientDetailsPage({
             <InlineEditable
               value={fullAddress}
               placeholder="Street, city, country"
+<<<<<<< HEAD
               onChange={(val) => updateField("address", val)}
+=======
+              onChange={updateAddressFromInput}
+>>>>>>> refactor-ui-cleanup
               className="details-value"
             />
           </div>
@@ -361,7 +535,11 @@ function PatientDetailsPage({
           <h3 className="section-subtitle">Notes</h3>
           <InlineEditable
             value={editablePatient.notes}
+<<<<<<< HEAD
             placeholder="Write your notes here..."
+=======
+            placeholder="Write your notes here."
+>>>>>>> refactor-ui-cleanup
             onChange={(val) => updateField("notes", val)}
             multiline
             className="details-box"
@@ -379,7 +557,15 @@ function PatientDetailsPage({
 
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
+<<<<<<< HEAD
         <PatientHistory patient={editablePatient} />
+=======
+        <PatientHistory
+          patient={editablePatient}
+          history={editablePatient.history}
+          onChangeHistory={updateHistory}
+        />
+>>>>>>> refactor-ui-cleanup
         <AttachReports
           patientId={editablePatient.idNumber}
           existingReports={editablePatient.reports || []}

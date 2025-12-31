@@ -1,4 +1,5 @@
 :root {
+<<<<<<< HEAD
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -7,6 +8,11 @@
   color: rgba(255, 255, 255, 0.87);
   background-color: #242424;
 
+=======
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+>>>>>>> refactor-ui-cleanup
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -15,15 +21,26 @@
 
 a {
   font-weight: 500;
+<<<<<<< HEAD
   color: #646cff;
   text-decoration: inherit;
 }
 a:hover {
   color: #535bf2;
+=======
+  color: #2563eb;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: #1d4ed8;
+>>>>>>> refactor-ui-cleanup
 }
 
 body {
   margin: 0;
+<<<<<<< HEAD
   display: flex;
   place-items: center;
   min-width: 320px;
@@ -65,4 +82,22 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+=======
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+/* Loading state */
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 1.1rem;
+  color: #6b7280;
+  font-weight: 500;
+>>>>>>> refactor-ui-cleanup
 }

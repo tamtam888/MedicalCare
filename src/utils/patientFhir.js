@@ -8,6 +8,7 @@ export function trimId(v) {
   return String(v ?? "").trim();
 }
 
+<<<<<<< HEAD
 function safeJsonParse(raw) {
   try {
     return JSON.parse(raw);
@@ -51,6 +52,11 @@ export function hasMedplumSession() {
     }
 
     return false;
+=======
+export function hasMedplumSession() {
+  try {
+    return !!localStorage.getItem("medplum:access_token");
+>>>>>>> refactor-ui-cleanup
   } catch {
     return false;
   }
@@ -64,6 +70,10 @@ export function toDateInputValue(d) {
   return date.toISOString().slice(0, 10);
 }
 
+<<<<<<< HEAD
+=======
+/** ✅ NEW: returns first non-empty (trimmed) string / value */
+>>>>>>> refactor-ui-cleanup
 function firstNonEmpty(...vals) {
   for (const v of vals) {
     if (v === undefined || v === null) continue;
@@ -77,6 +87,7 @@ function firstNonEmpty(...vals) {
   return "";
 }
 
+<<<<<<< HEAD
 function normalizeGenderUi(value) {
   const v = String(value ?? "").trim().toLowerCase();
 
@@ -114,6 +125,9 @@ function toFhirGender(value) {
   return undefined;
 }
 
+=======
+// ✅ address can be object OR array (FHIR)
+>>>>>>> refactor-ui-cleanup
 function getAddr(p) {
   const addr = p?.address;
   return Array.isArray(addr) ? addr[0] : addr;
@@ -123,7 +137,17 @@ function pickStreet(p) {
   const addr = getAddr(p);
   const line0 = Array.isArray(addr?.line) ? addr.line[0] : undefined;
 
+<<<<<<< HEAD
   return firstNonEmpty(p?.street, addr?.street, addr?.line1, line0, "");
+=======
+  return firstNonEmpty(
+    p?.street,
+    addr?.street,
+    addr?.line1,
+    line0,
+    ""
+  );
+>>>>>>> refactor-ui-cleanup
 }
 
 function pickCity(p) {
@@ -143,6 +167,10 @@ export function normalizePatient(raw = {}) {
   const firstName = String(p.firstName ?? "").trim();
   const lastName = String(p.lastName ?? "").trim();
 
+<<<<<<< HEAD
+=======
+  // ✅ FIX: ignore empty dob string and fallback to other DOB fields
+>>>>>>> refactor-ui-cleanup
   const dobSource = firstNonEmpty(
     p.dob,
     p.dateOfBirth,
@@ -157,7 +185,11 @@ export function normalizePatient(raw = {}) {
   const zipCode = String(pickZip(p) ?? "").trim();
 
   const status = p.status || p.clinicalStatus || "Active";
+<<<<<<< HEAD
   const gender = normalizeGenderUi(p.gender);
+=======
+  const gender = p.gender || "Other";
+>>>>>>> refactor-ui-cleanup
 
   const conditions = Array.isArray(p.conditions)
     ? p.conditions
@@ -179,9 +211,18 @@ export function normalizePatient(raw = {}) {
     gender,
     status,
     clinicalStatus: p.clinicalStatus || status,
+<<<<<<< HEAD
     street,
     city,
     zipCode,
+=======
+
+    // keep flat fields for your UI
+    street,
+    city,
+    zipCode,
+
+>>>>>>> refactor-ui-cleanup
     conditions,
     history: ensureArray(p.history),
     reports: ensureArray(p.reports),
@@ -195,16 +236,24 @@ export function toFhirPatient(patient) {
   return {
     resourceType: "Patient",
     id: p.medplumId || undefined,
+<<<<<<< HEAD
     identifier: p.idNumber
       ? [{ system: ID_SYSTEM, value: p.idNumber }]
       : undefined,
+=======
+    identifier: p.idNumber ? [{ system: ID_SYSTEM, value: p.idNumber }] : undefined,
+>>>>>>> refactor-ui-cleanup
     name: [
       {
         family: p.lastName || undefined,
         given: p.firstName ? [p.firstName] : undefined,
       },
     ],
+<<<<<<< HEAD
     gender: toFhirGender(p.gender),
+=======
+    gender: p.gender ? String(p.gender).toLowerCase() : undefined,
+>>>>>>> refactor-ui-cleanup
     birthDate: p.dob || undefined,
     address: hasAddress
       ? [
@@ -235,13 +284,20 @@ export function fromFhirPatient(fhir) {
     firstName: given || "",
     lastName: name0?.family || "",
     dob: toDateInputValue(fhir?.birthDate),
+<<<<<<< HEAD
     gender: normalizeGenderUi(fhir?.gender),
+=======
+    gender: fhir?.gender
+      ? String(fhir.gender).charAt(0).toUpperCase() + String(fhir.gender).slice(1)
+      : "Other",
+>>>>>>> refactor-ui-cleanup
     street: line0 || "",
     city: addr0?.city || "",
     zipCode: addr0?.postalCode || "",
   });
 }
 
+<<<<<<< HEAD
 export function historyItemToObservation(patient, item, index = 0) {
   const p = normalizePatient(patient);
   const h = item && typeof item === "object" ? item : {};
@@ -277,4 +333,12 @@ export function reportToDiagnosticReport(patient, report, index = 0) {
     code: { text: r.name || r.type || `Report ${index + 1}` },
     conclusion: r.description ? String(r.description) : undefined,
   };
+=======
+export function historyItemToObservation() {
+  throw new Error("historyItemToObservation not implemented");
+}
+
+export function reportToDiagnosticReport() {
+  throw new Error("reportToDiagnosticReport not implemented");
+>>>>>>> refactor-ui-cleanup
 }

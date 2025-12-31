@@ -19,7 +19,11 @@ function PatientsPage(props) {
     handleDeletePatient,
     handleImportPatients,
     handleExportPatients,
+<<<<<<< HEAD
     handleSelectPatient,
+=======
+    handleSelectPatient
+>>>>>>> refactor-ui-cleanup
   } = props;
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,7 +43,15 @@ function PatientsPage(props) {
   }
 
   function callUpdatePatient(patient) {
+<<<<<<< HEAD
     const id = patient?.idNumber || patient?.id || patient?.medplumId || null;
+=======
+    const id =
+      patient?.idNumber ||
+      patient?.id ||
+      patient?.medplumId ||
+      null;
+>>>>>>> refactor-ui-cleanup
 
     if (typeof handleUpdatePatientInline === "function") {
       if (handleUpdatePatientInline.length >= 2) {
@@ -60,7 +72,15 @@ function PatientsPage(props) {
   }
 
   function callDeletePatient(patient) {
+<<<<<<< HEAD
     const id = patient?.idNumber || patient?.id || patient?.medplumId || null;
+=======
+    const id =
+      patient?.idNumber ||
+      patient?.id ||
+      patient?.medplumId ||
+      null;
+>>>>>>> refactor-ui-cleanup
 
     if (typeof handleDeletePatient === "function") {
       if (handleDeletePatient.length >= 2) {
@@ -81,6 +101,7 @@ function PatientsPage(props) {
   }
 
   function callSelectPatient(patient) {
+<<<<<<< HEAD
     const id = patient?.idNumber || patient?.id || null;
 
     if (typeof handleSelectPatient === "function") {
@@ -89,6 +110,19 @@ function PatientsPage(props) {
       onSelectPatient(id);
     }
 
+=======
+    if (typeof handleSelectPatient === "function") {
+      handleSelectPatient(patient);
+    } else if (typeof onSelectPatient === "function") {
+      onSelectPatient(patient);
+    }
+
+    const id =
+      patient?.idNumber ||
+      patient?.id ||
+      null;
+
+>>>>>>> refactor-ui-cleanup
     if (id) {
       navigate(`/patients/${encodeURIComponent(id)}`);
     }
