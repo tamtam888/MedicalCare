@@ -1,5 +1,9 @@
 // src/components/AttachReports.jsx
+<<<<<<< HEAD
 import { useState } from "react";
+=======
+import React, { useState } from "react";
+>>>>>>> refactor-ui-cleanup
 
 function AttachReports({ patientId, existingReports, onAddReport }) {
   const [uploadError, setUploadError] = useState("");
@@ -30,11 +34,19 @@ function AttachReports({ patientId, existingReports, onAddReport }) {
     event.target.value = "";
   };
 
+<<<<<<< HEAD
   const handleDownload = () => {
     alert("Download is not implemented yet in this MVP.");
   };
 
   const handleDelete = () => {
+=======
+  const handleDownload = (report) => {
+    alert("Download is not implemented yet in this MVP.");
+  };
+
+  const handleDelete = (reportId) => {
+>>>>>>> refactor-ui-cleanup
     alert("Delete is not implemented yet in this MVP.");
   };
 
@@ -81,14 +93,22 @@ function AttachReports({ patientId, existingReports, onAddReport }) {
                 <button
                   type="button"
                   className="secondary-button"
+<<<<<<< HEAD
                   onClick={handleDownload}
+=======
+                  onClick={() => handleDownload(report)}
+>>>>>>> refactor-ui-cleanup
                 >
                   Download
                 </button>
                 <button
                   type="button"
                   className="danger-button"
+<<<<<<< HEAD
                   onClick={handleDelete}
+=======
+                  onClick={() => handleDelete(report.id)}
+>>>>>>> refactor-ui-cleanup
                 >
                   Delete
                 </button>

@@ -1,7 +1,13 @@
+<<<<<<< HEAD
 .app-sidebar {
   width: 240px;
   min-width: 240px;
   flex: 0 0 240px;
+=======
+/* ----- Base Sidebar ----- */
+.app-sidebar {
+  width: 240px;
+>>>>>>> refactor-ui-cleanup
   min-height: 100vh;
   padding: 1.4rem 0 1.6rem;
   box-sizing: border-box;
@@ -9,9 +15,15 @@
   flex-direction: column;
   background: linear-gradient(180deg, #ece2ff, #dcc7ff);
   border-right: 1px solid #bca2ff;
+<<<<<<< HEAD
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
+=======
+}
+
+/* RTL/LTR */
+>>>>>>> refactor-ui-cleanup
 .sidebar-ltr {
   direction: ltr;
 }
@@ -20,11 +32,19 @@
   direction: rtl;
 }
 
+<<<<<<< HEAD
 /* Brand (logo + title) */
 .sidebar-brand {
   display: flex;
   align-items: center;
   padding: 0 0.55rem 1.6rem; 
+=======
+/* ----- Brand (top area) ----- */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  padding: 0 0.55rem 1.6rem;
+>>>>>>> refactor-ui-cleanup
 }
 
 .sidebar-brand-logo {
@@ -42,22 +62,39 @@
   margin-inline-end: 1rem;
 }
 
+<<<<<<< HEAD
 .sidebar-brand-logo-img {
+=======
+.sidebar-brand-logo img {
+>>>>>>> refactor-ui-cleanup
   width: 90%;
   height: 90%;
   object-fit: contain;
 }
 
+<<<<<<< HEAD
 .sidebar-brand-text {
   display: flex;
   flex-direction: column;
+=======
+
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+ 
+>>>>>>> refactor-ui-cleanup
 }
 
 .sidebar-brand-title {
   font-size: 19px;
   font-weight: 700;
   color: #2b1e47;
+<<<<<<< HEAD
   margin: 0;
+=======
+  margin-inline-end: 0;
+
+>>>>>>> refactor-ui-cleanup
 }
 
 .sidebar-brand-subtitle {
@@ -65,7 +102,11 @@
   color: #6c4a9c;
 }
 
+<<<<<<< HEAD
 /* Navigation */
+=======
+/* ----- Navigation List ----- */
+>>>>>>> refactor-ui-cleanup
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -73,6 +114,10 @@
   padding: 0 0.6rem;
 }
 
+<<<<<<< HEAD
+=======
+/* Single link */
+>>>>>>> refactor-ui-cleanup
 .sidebar-link {
   display: flex;
   align-items: center;
@@ -83,11 +128,21 @@
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
+<<<<<<< HEAD
   transition: background-color 0.18s ease, transform 0.12s ease,
     box-shadow 0.18s ease;
   user-select: none;
 }
 
+=======
+  transition:
+    background-color 0.18s ease,
+    transform 0.12s ease,
+    box-shadow 0.18s ease;
+}
+
+/* Icon bubble next to each item */
+>>>>>>> refactor-ui-cleanup
 .sidebar-link-icon {
   width: 28px;
   height: 28px;
@@ -97,6 +152,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+<<<<<<< HEAD
   flex: 0 0 28px;
 }
 
@@ -106,12 +162,22 @@
   line-height: 1;
 }
 
+=======
+  font-size: 17px;
+}
+
+/* Hover */
+>>>>>>> refactor-ui-cleanup
 .sidebar-link:hover {
   background-color: #ceb1ff;
   box-shadow: 0 4px 10px rgba(90, 50, 140, 0.2);
   transform: translateY(-2px);
 }
 
+<<<<<<< HEAD
+=======
+/* Active link */
+>>>>>>> refactor-ui-cleanup
 .sidebar-link-active {
   background-color: #b08cff !important;
   color: #ffffff !important;
@@ -123,6 +189,10 @@
   border-color: #6e43d4;
 }
 
+<<<<<<< HEAD
+=======
+/* Section titles */
+>>>>>>> refactor-ui-cleanup
 .sidebar-section-title {
   font-size: 11px;
   margin: 16px 14px 6px;
@@ -133,7 +203,11 @@
   opacity: 0.85;
 }
 
+<<<<<<< HEAD
 /* Dark mode */
+=======
+/* ----- Dark Mode (automatic) ----- */
+>>>>>>> refactor-ui-cleanup
 @media (prefers-color-scheme: dark) {
   .app-sidebar {
     background: linear-gradient(180deg, #1b1333, #0d071b);
@@ -172,6 +246,7 @@
   }
 }
 
+<<<<<<< HEAD
 /* Mobile */
 @media (max-width: 768px) {
   .app-sidebar {
@@ -187,17 +262,34 @@
 
   .sidebar-brand {
     padding: 0 0.25rem 1rem;
+=======
+/* Responsive sidebar */
+@media (max-width: 768px) {
+  .app-sidebar {
+    width: 100%;
+    min-height: auto;
+    padding: 1rem;
+    border-right: none;
+    border-bottom: 1px solid #bca2ff;
+>>>>>>> refactor-ui-cleanup
   }
 
   .sidebar-nav {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.5rem;
+<<<<<<< HEAD
     padding: 0;
+=======
+>>>>>>> refactor-ui-cleanup
   }
 
   .sidebar-link {
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> refactor-ui-cleanup
