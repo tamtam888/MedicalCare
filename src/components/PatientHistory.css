@@ -76,8 +76,6 @@
   min-width: 180px;
 }
 
-<<<<<<< HEAD
-=======
 /* Add entry – same family as Import/Export pills (light pill) */
 
 .history-add-button {
@@ -98,7 +96,6 @@
   border-color: #d1d5db;
 }
 
->>>>>>> refactor-ui-cleanup
 /* list and items */
 
 .history-list {
@@ -117,25 +114,18 @@
 }
 
 /* special style for transcriptions */
-<<<<<<< HEAD
-
-=======
->>>>>>> refactor-ui-cleanup
 .history-item-transcription {
   background-color: #faf5ff;
   border-color: #e9d5ff;
   box-shadow: 0 4px 10px rgba(129, 140, 248, 0.18);
 }
 
-<<<<<<< HEAD
-=======
 .history-item-top {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
->>>>>>> refactor-ui-cleanup
 .history-meta-row {
   display: flex;
   align-items: baseline;
@@ -144,14 +134,6 @@
   margin-bottom: 0.2rem;
 }
 
-<<<<<<< HEAD
-.history-meta-type {
-  font-weight: 600;
-  color: #7c3aed;
-}
-
-=======
->>>>>>> refactor-ui-cleanup
 .history-meta-separator {
   color: #9ca3af;
 }
@@ -161,8 +143,6 @@
   font-weight: 500;
 }
 
-<<<<<<< HEAD
-=======
 /* type pill */
 
 .history-type-pill {
@@ -213,7 +193,6 @@
 
 /* content */
 
->>>>>>> refactor-ui-cleanup
 .history-title-line {
   font-size: 0.9rem;
   font-weight: 600;
@@ -232,17 +211,6 @@
   color: #1e1b4b;
 }
 
-<<<<<<< HEAD
-.history-visit-note {
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: #374151;
-  margin-bottom: 0.4rem;
-  font-weight: 500;
-}
-
-=======
->>>>>>> refactor-ui-cleanup
 .history-summary-audio-only {
   font-style: italic;
   color: #6b7280;
@@ -257,8 +225,6 @@
   max-width: 400px;
 }
 
-<<<<<<< HEAD
-=======
 /* actions – icon buttons like Patient Directory */
 
 .history-item-actions {
@@ -388,7 +354,6 @@
   box-shadow: 0 0 0 3px rgba(196, 181, 253, 0.45);
 }
 
->>>>>>> refactor-ui-cleanup
 /* responsive */
 
 @media (max-width: 768px) {
@@ -406,19 +371,6 @@
   }
 }
 
-<<<<<<< HEAD
-@media (max-width: 480px) {
-  .history-meta-row {
-    font-size: 0.78rem;
-  }
-
-  .history-summary {
-    font-size: 0.85rem;
-  }
-}
-
-=======
->>>>>>> refactor-ui-cleanup
 /* RTL support */
 [dir="rtl"] .patient-history-header {
   flex-direction: row-reverse;
