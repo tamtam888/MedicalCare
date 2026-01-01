@@ -76,6 +76,29 @@
   min-width: 180px;
 }
 
+<<<<<<< HEAD
+=======
+/* Add entry – same family as Import/Export pills (light pill) */
+
+.history-add-button {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+  font-weight: 700;
+  font-size: 0.85rem;
+
+  padding: 0.42rem 0.95rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.history-add-button:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+>>>>>>> refactor-ui-cleanup
 /* list and items */
 
 .history-list {
@@ -94,13 +117,25 @@
 }
 
 /* special style for transcriptions */
+<<<<<<< HEAD
 
+=======
+>>>>>>> refactor-ui-cleanup
 .history-item-transcription {
   background-color: #faf5ff;
   border-color: #e9d5ff;
   box-shadow: 0 4px 10px rgba(129, 140, 248, 0.18);
 }
 
+<<<<<<< HEAD
+=======
+.history-item-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+>>>>>>> refactor-ui-cleanup
 .history-meta-row {
   display: flex;
   align-items: baseline;
@@ -109,11 +144,14 @@
   margin-bottom: 0.2rem;
 }
 
+<<<<<<< HEAD
 .history-meta-type {
   font-weight: 600;
   color: #7c3aed;
 }
 
+=======
+>>>>>>> refactor-ui-cleanup
 .history-meta-separator {
   color: #9ca3af;
 }
@@ -123,6 +161,59 @@
   font-weight: 500;
 }
 
+<<<<<<< HEAD
+=======
+/* type pill */
+
+.history-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.history-type-pill.transcription {
+  color: #6d28d9;
+  background: #f3e8ff;
+  border-color: #e9d5ff;
+}
+
+.history-type-pill.session {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #dbeafe;
+}
+
+.history-type-pill.note {
+  color: #334155;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.history-type-pill.careplan {
+  color: #0f766e;
+  background: #ecfeff;
+  border-color: #cffafe;
+}
+
+.history-type-pill.report {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.history-type-pill.other {
+  color: #374151;
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+/* content */
+
+>>>>>>> refactor-ui-cleanup
 .history-title-line {
   font-size: 0.9rem;
   font-weight: 600;
@@ -141,6 +232,7 @@
   color: #1e1b4b;
 }
 
+<<<<<<< HEAD
 .history-visit-note {
   font-size: 0.9rem;
   line-height: 1.5;
@@ -149,6 +241,8 @@
   font-weight: 500;
 }
 
+=======
+>>>>>>> refactor-ui-cleanup
 .history-summary-audio-only {
   font-style: italic;
   color: #6b7280;
@@ -163,6 +257,138 @@
   max-width: 400px;
 }
 
+<<<<<<< HEAD
+=======
+/* actions – icon buttons like Patient Directory */
+
+.history-item-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+/* circular icon button */
+.history-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.history-icon-btn:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+/* delete icon button: red ring like screenshot */
+.history-icon-btn.danger {
+  border-color: #fca5a5;
+  color: #ef4444;
+}
+
+.history-icon-btn.danger:hover {
+  background-color: #fff1f2;
+  border-color: #fb7185;
+  color: #e11d48;
+}
+
+.history-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* edit mode pill buttons (Save/Cancel) – same family as pills */
+.history-pill-btn {
+  background: #ffffff;
+  border: 1px solid #e5e7eb27;
+  color: #111827;
+  font-weight: 700;
+  font-size: 0.78rem;
+
+  padding: 0.32rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.history-pill-btn:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.history-pill-btn.primary {
+  border-color: #c4b5fd;
+  color: #6d28d9;
+}
+
+.history-pill-btn.primary:hover {
+  background-color: #f5f3ff;
+  border-color: #a78bfa;
+}
+
+/* edit form */
+
+.history-edit-form {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed #e5e7eb;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.history-edit-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.history-edit-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.history-edit-input {
+  font-size: 0.85rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  outline: none;
+}
+
+.history-edit-input:focus {
+  border-color: #c4b5fd;
+  box-shadow: 0 0 0 3px rgba(196, 181, 253, 0.45);
+}
+
+.history-edit-textarea {
+  font-size: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb1d;
+  background: #ffffff;
+  outline: none;
+  resize: vertical;
+}
+
+.history-edit-textarea:focus {
+  border-color: #c4b5fd;
+  box-shadow: 0 0 0 3px rgba(196, 181, 253, 0.45);
+}
+
+>>>>>>> refactor-ui-cleanup
 /* responsive */
 
 @media (max-width: 768px) {
@@ -180,6 +406,7 @@
   }
 }
 
+<<<<<<< HEAD
 @media (max-width: 480px) {
   .history-meta-row {
     font-size: 0.78rem;
@@ -190,6 +417,8 @@
   }
 }
 
+=======
+>>>>>>> refactor-ui-cleanup
 /* RTL support */
 [dir="rtl"] .patient-history-header {
   flex-direction: row-reverse;

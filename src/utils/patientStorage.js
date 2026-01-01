@@ -1,5 +1,3 @@
-// src/utils/patientStorage.js
-
 const STORAGE_KEY = "patients";
 const BACKUP_KEY = `${STORAGE_KEY}_backup`; // patients_backup
 
@@ -76,17 +74,11 @@ export function loadPatientsFromStorage() {
     if (typeof window === "undefined") return [];
 
     // 1) Try primary key first
-    const primary = safeParseArray(
-      window.localStorage.getItem(STORAGE_KEY),
-      STORAGE_KEY
-    );
+    const primary = safeParseArray(window.localStorage.getItem(STORAGE_KEY), STORAGE_KEY);
     if (primary && primary.length > 0) return normalizePatients(primary);
 
     // 2) Try the backup key used by usePatients.js
-    const backup = safeParseArray(
-      window.localStorage.getItem(BACKUP_KEY),
-      BACKUP_KEY
-    );
+    const backup = safeParseArray(window.localStorage.getItem(BACKUP_KEY), BACKUP_KEY);
     if (backup && backup.length > 0) return normalizePatients(backup);
 
     // 3) Try legacy keys
@@ -96,11 +88,7 @@ export function loadPatientsFromStorage() {
         const normalized = normalizePatients(arr);
         try {
           writeAll(normalized);
-          if (isDev) {
-            console.log(
-              `[patientStorage] Migrated from ${key} -> ${STORAGE_KEY}`
-            );
-          }
+          if (isDev) console.log(`[patientStorage] Migrated from ${key} -> ${STORAGE_KEY}`);
         } catch {}
         return normalized;
       }
@@ -135,39 +123,19 @@ export function savePatientsToStorage(patients) {
     const hasBackup = Boolean(window.localStorage.getItem(BACKUP_KEY));
     if (hasPrimary || hasBackup) return;
 
-    const legacy =
-      safeParseArray(
-        window.localStorage.getItem("patients:main"),
-        "patients:main"
-      ) ||
-      safeParseArray(
-        window.localStorage.getItem("patients:backup"),
-        "patients:backup"
-      ) ||
-      safeParseArray(
-        window.localStorage.getItem("patientsBackup"),
-        "patientsBackup"
-      ) ||
-      safeParseArray(
-        window.localStorage.getItem("patients_main"),
-        "patients_main"
-      ) ||
-      safeParseArray(
-        window.localStorage.getItem("patients_backup"),
-        "patients_backup"
-      );
+    const legacy = safeParseArray(window.localStorage.getItem("patients:main"), "patients:main")
+      || safeParseArray(window.localStorage.getItem("patients:backup"), "patients:backup")
+      || safeParseArray(window.localStorage.getItem("patientsBackup"), "patientsBackup")
+      || safeParseArray(window.localStorage.getItem("patients_main"), "patients_main")
+      || safeParseArray(window.localStorage.getItem("patients_backup"), "patients_backup");
 
     if (!legacy || legacy.length === 0) return;
 
     const normalized = normalizePatients(legacy);
     writeAll(normalized);
 
-    if (isDev) {
-      console.log("[patientStorage] Auto-migrated legacy storage -> patients");
-    }
+    if (isDev) console.log("[patientStorage] Auto-migrated legacy storage -> patients");
   } catch (e) {
-    if (isDev) {
-      console.warn("[patientStorage] Auto-migration failed", e);
-    }
+    if (isDev) console.warn("[patientStorage] Auto-migration failed", e);
   }
 })();
