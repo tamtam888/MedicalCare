@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useMemo, useState } from "react";
-=======
 import { useEffect, useState } from "react";
->>>>>>> refactor-ui-cleanup
 import "./PatientForm.css";
 
 const defaultValues = {
@@ -101,15 +97,6 @@ function normalizeInitialValues(initialValues) {
   };
 }
 
-<<<<<<< HEAD
-function PatientFormInner({ onClose, onSubmit, initialValues }) {
- const [values] = useState(() =>
-  initialValues ? normalizeInitialValues(initialValues) : defaultValues
-);
-
-  const [errors, setErrors] = useState({});
-  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
-=======
 function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
   const [values, setValues] = useState(defaultValues);
   const [errors, setErrors] = useState({});
@@ -130,7 +117,6 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
     const { name, value } = e.target;
     setValues((prev) => ({ ...prev, [name]: value }));
   }
->>>>>>> refactor-ui-cleanup
 
   function validate(v) {
     const e = {};
@@ -179,22 +165,11 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
       _originalIdNumber: base.idNumber || base.id || trimmedIdNumber,
       idNumber: trimmedIdNumber,
       id: base.idNumber || base.id || trimmedIdNumber,
-<<<<<<< HEAD
-=======
 
->>>>>>> refactor-ui-cleanup
       firstName: values.firstName.trim(),
       lastName: values.lastName.trim(),
       phone: values.phone.trim(),
       email: values.email.trim(),
-<<<<<<< HEAD
-      street: values.street.trim(),
-      city: values.city.trim(),
-      zipCode: values.zipCode.trim(),
-      status: values.status,
-      clinicalStatus: values.status,
-      dob: toDateInputValue(values.dob),
-=======
 
       street: values.street.trim(),
       city: values.city.trim(),
@@ -204,7 +179,6 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
       clinicalStatus: values.status,
       dob: toDateInputValue(values.dob),
 
->>>>>>> refactor-ui-cleanup
       conditions: values.conditions
         ? values.conditions
             .split(",")
@@ -216,11 +190,8 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
     onSubmit?.(prepared);
   }
 
-<<<<<<< HEAD
-=======
   if (!isOpen) return null;
 
->>>>>>> refactor-ui-cleanup
   return (
     <div className="modal-backdrop">
       <div className="modal-container">
@@ -243,9 +214,6 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
         )}
 
         <form className="patient-form" onSubmit={handleSubmit}>
-<<<<<<< HEAD
-          {/* UI unchanged */}
-=======
           <div className="form-row">
             <div className={`form-field ${errors.idNumber ? "has-error" : ""}`}>
               <label>
@@ -384,32 +352,10 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
               {initialValues ? "Save Changes" : "Add Patient"}
             </button>
           </div>
->>>>>>> refactor-ui-cleanup
         </form>
       </div>
     </div>
   );
 }
 
-<<<<<<< HEAD
-function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
-  const remountKey = useMemo(() => {
-    const id = initialValues?.idNumber || initialValues?.id || "new";
-    return `${isOpen ? "open" : "closed"}:${String(id)}`;
-  }, [isOpen, initialValues?.idNumber, initialValues?.id]);
-
-  if (!isOpen) return null;
-
-  return (
-    <PatientFormInner
-      key={remountKey}
-      onClose={onClose}
-      onSubmit={onSubmit}
-      initialValues={initialValues}
-    />
-  );
-}
-
-=======
->>>>>>> refactor-ui-cleanup
 export default PatientForm;

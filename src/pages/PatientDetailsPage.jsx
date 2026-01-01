@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useMemo, useRef, useState } from "react";
-=======
 import { useMemo, useState, useEffect } from "react";
->>>>>>> refactor-ui-cleanup
 import { useParams, useNavigate } from "react-router-dom";
 import PatientHistory from "../components/PatientHistory";
 import AttachReports from "../components/AttachReports";
@@ -18,43 +14,24 @@ function InlineEditable({
   className = "",
 }) {
   const [editing, setEditing] = useState(false);
-<<<<<<< HEAD
-  const [draft, setDraft] = useState("");
-
-  const startEditing = () => {
-    setDraft(value ?? "");
-    setEditing(true);
-  };
-=======
   const [draft, setDraft] = useState(value || "");
 
   useEffect(() => {
     if (!editing) setDraft(value || "");
   }, [value, editing]);
->>>>>>> refactor-ui-cleanup
 
   const finish = () => {
     setEditing(false);
     const next = draft ?? "";
-<<<<<<< HEAD
-    if (next !== (value ?? "")) {
-      onChange(next);
-    }
-=======
     if (next !== (value ?? "")) onChange(next);
->>>>>>> refactor-ui-cleanup
   };
 
   if (!editing) {
     return (
-<<<<<<< HEAD
-      <span className={`editable-field ${className}`} onClick={startEditing}>
-=======
       <span
         className={`editable-field ${className}`}
         onClick={() => setEditing(true)}
       >
->>>>>>> refactor-ui-cleanup
         {value && String(value).trim().length > 0 ? value : placeholder}
       </span>
     );
@@ -84,8 +61,6 @@ function InlineEditable({
   );
 }
 
-<<<<<<< HEAD
-=======
 function pickFirstAddress(address) {
   if (!address) return null;
   if (Array.isArray(address)) return address[0] ?? null;
@@ -108,7 +83,6 @@ function buildAddressString(patient) {
   return [street, city, country].filter(Boolean).join(", ");
 }
 
->>>>>>> refactor-ui-cleanup
 function PatientDetailsPage({
   patients,
   selectedPatientFullName,
@@ -123,91 +97,6 @@ function PatientDetailsPage({
   const { idNumber } = useParams();
   const navigate = useNavigate();
 
-<<<<<<< HEAD
-  const patient = useMemo(
-    () =>
-      patients.find(
-        (p) =>
-          p.idNumber &&
-          p.idNumber.toString().trim() === String(idNumber).trim()
-      ) || null,
-    [patients, idNumber]
-  );
-
-  const patientKey = patient?.idNumber ? String(patient.idNumber).trim() : "";
-
-  const overridesRef = useRef(new Map());
-  const [renderTick, setRenderTick] = useState(0);
-
-  const editablePatient = useMemo(() => {
-    if (!patient) return null;
-    const overrides = overridesRef.current.get(patientKey) || {};
-    return { ...patient, ...overrides };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patient, patientKey, renderTick]);
-
-  const updateField = (field, value) => {
-    if (!patient) return;
-
-    const current = overridesRef.current.get(patientKey) || {};
-    const nextOverrides = { ...current, [field]: value };
-    overridesRef.current.set(patientKey, nextOverrides);
-
-    const updated = { ...patient, ...nextOverrides };
-    if (typeof onUpdatePatient === "function") {
-      onUpdatePatient(updated);
-    }
-
-    setRenderTick((t) => t + 1);
-  };
-
-  const handleClose = () => {
-    navigate("/patients");
-  };
-
-  const handleSaveTranscriptionForPatient = (text, audioUrl) => {
-    const targetId = editablePatient?.idNumber;
-    const cleanText = text?.trim() || "";
-    const hasAudio = Boolean(audioUrl);
-
-    if (!targetId) return;
-    if (!cleanText && !hasAudio) return;
-
-    if (typeof handleSelectPatient === "function") {
-      handleSelectPatient(targetId);
-    }
-
-    handleSaveTranscription(targetId, cleanText, audioUrl || "");
-  };
-
-  const handleAddReportForPatient = (meta) => {
-    if (!editablePatient?.idNumber) return;
-
-    if (typeof handleSelectPatient === "function") {
-      handleSelectPatient(editablePatient.idNumber);
-    }
-    handleAddReport(editablePatient.idNumber, meta);
-  };
-
-  const handleExportClick = () => {
-    if (typeof handleExportPatients === "function") {
-      handleExportPatients();
-    } else {
-      alert("Export is not configured yet in the app.");
-    }
-  };
-
-  const handleImportChange = (event) => {
-    if (typeof handleImportPatients === "function") {
-      handleImportPatients(event);
-    } else {
-      alert("Import is not configured yet in the app.");
-    }
-    if (event?.target) {
-      event.target.value = "";
-    }
-  };
-=======
   const patient = useMemo(() => {
     const idTrim = String(idNumber ?? "").trim();
     return (
@@ -220,7 +109,6 @@ function PatientDetailsPage({
   useEffect(() => {
     setEditablePatient(patient || null);
   }, [patient]);
->>>>>>> refactor-ui-cleanup
 
   if (!patient || !editablePatient) {
     return (
@@ -244,8 +132,6 @@ function PatientDetailsPage({
       .filter(Boolean)
       .join(" ");
 
-<<<<<<< HEAD
-=======
   const updateField = (field, value) => {
     setEditablePatient((prev) => {
       if (!prev) return prev;
@@ -305,7 +191,6 @@ function PatientDetailsPage({
     navigate("/patients");
   };
 
->>>>>>> refactor-ui-cleanup
   const clinicalStatus = (editablePatient.clinicalStatus || "")
     .toString()
     .trim()
@@ -353,14 +238,6 @@ function PatientDetailsPage({
       ? "avatar-male"
       : "avatar-other";
 
-<<<<<<< HEAD
-  const fullAddress =
-    editablePatient.address ||
-    [editablePatient.street, editablePatient.city, editablePatient.country]
-      .filter(Boolean)
-      .join(", ") ||
-    "";
-=======
   const handleSaveTranscriptionForPatient = (text, audioUrl) => {
     const targetId = editablePatient.idNumber;
     const cleanText = text?.trim() || "";
@@ -403,7 +280,6 @@ function PatientDetailsPage({
   };
 
   const fullAddress = buildAddressString(editablePatient);
->>>>>>> refactor-ui-cleanup
 
   return (
     <div className="app-container patient-details-page">
@@ -494,11 +370,7 @@ function PatientDetailsPage({
             <InlineEditable
               value={fullAddress}
               placeholder="Street, city, country"
-<<<<<<< HEAD
-              onChange={(val) => updateField("address", val)}
-=======
               onChange={updateAddressFromInput}
->>>>>>> refactor-ui-cleanup
               className="details-value"
             />
           </div>
@@ -535,11 +407,7 @@ function PatientDetailsPage({
           <h3 className="section-subtitle">Notes</h3>
           <InlineEditable
             value={editablePatient.notes}
-<<<<<<< HEAD
-            placeholder="Write your notes here..."
-=======
             placeholder="Write your notes here."
->>>>>>> refactor-ui-cleanup
             onChange={(val) => updateField("notes", val)}
             multiline
             className="details-box"
@@ -557,15 +425,11 @@ function PatientDetailsPage({
 
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
-<<<<<<< HEAD
-        <PatientHistory patient={editablePatient} />
-=======
         <PatientHistory
           patient={editablePatient}
           history={editablePatient.history}
           onChangeHistory={updateHistory}
         />
->>>>>>> refactor-ui-cleanup
         <AttachReports
           patientId={editablePatient.idNumber}
           existingReports={editablePatient.reports || []}

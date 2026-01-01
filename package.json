@@ -10,14 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
-    "@medplum/core": "^5.0.10",
-    "@medplum/react": "^5.0.10",
-    "lucide-react": "^0.562.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-router-dom": "^7.11.0"
-=======
     "@hookform/resolvers": "^5.2.2",
     "@medplum/core": "^5.0.7",
     "lucide-react": "^0.556.0",
@@ -26,7 +18,6 @@
     "react-hook-form": "^7.68.0",
     "react-router-dom": "^7.10.1",
     "zod": "^4.1.13"
->>>>>>> refactor-ui-cleanup
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

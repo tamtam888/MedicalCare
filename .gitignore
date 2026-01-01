@@ -23,13 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
-<<<<<<< HEAD
-wip-*.patch
-wip-*.txt
-=======
 
 #wip patches
 wip-*.patch
 wip-*.txt
 
->>>>>>> refactor-ui-cleanup

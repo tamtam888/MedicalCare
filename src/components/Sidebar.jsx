@@ -1,15 +1,9 @@
-<<<<<<< HEAD
-=======
 // src/components/Sidebar.jsx
->>>>>>> refactor-ui-cleanup
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Stethoscope,
-<<<<<<< HEAD
-=======
   Pill,
->>>>>>> refactor-ui-cleanup
   ClipboardList,
   CalendarDays,
   BarChart2,
@@ -23,15 +17,11 @@ function Sidebar() {
     <aside className="app-sidebar sidebar-ltr">
       <div className="sidebar-brand">
         <div className="sidebar-brand-logo">
-<<<<<<< HEAD
-          <img src="/icon.png" alt="MedicalCare logo" className="sidebar-brand-logo-img" />
-=======
           <img
             src="/icon.png"
             alt="MedicalCare logo"
             className="sidebar-brand-logo-img"
           />
->>>>>>> refactor-ui-cleanup
         </div>
 
         <div className="sidebar-brand-text">
@@ -43,13 +33,9 @@ function Sidebar() {
       <nav className="sidebar-nav">
         <NavLink
           to="/dashboard"
-<<<<<<< HEAD
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <LayoutDashboard size={18} />
@@ -59,13 +45,9 @@ function Sidebar() {
 
         <NavLink
           to="/patients"
-<<<<<<< HEAD
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <Stethoscope size={18} />
@@ -76,10 +58,6 @@ function Sidebar() {
         <div className="sidebar-section-title">Data</div>
 
         <NavLink
-<<<<<<< HEAD
-          to="/data/care-plan"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           to="/data/treatment"
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
@@ -96,7 +74,6 @@ function Sidebar() {
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <ClipboardList size={18} />
@@ -106,13 +83,9 @@ function Sidebar() {
 
         <NavLink
           to="/data/appointment"
-<<<<<<< HEAD
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <CalendarDays size={18} />
@@ -124,13 +97,9 @@ function Sidebar() {
 
         <NavLink
           to="/analytics"
-<<<<<<< HEAD
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <BarChart2 size={18} />
@@ -140,13 +109,9 @@ function Sidebar() {
 
         <NavLink
           to="/security"
-<<<<<<< HEAD
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <Shield size={18} />
@@ -156,13 +121,9 @@ function Sidebar() {
 
         <NavLink
           to="/api"
-<<<<<<< HEAD
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-=======
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " sidebar-link-active" : "")
           }
->>>>>>> refactor-ui-cleanup
         >
           <span className="sidebar-link-icon">
             <Link2 size={18} />
