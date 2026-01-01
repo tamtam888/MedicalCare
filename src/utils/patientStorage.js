@@ -1,5 +1,3 @@
-כלב הזה אין בכלל את ה-Patient Storage, שולחת לך את הקוד של ה-Patient Storage.// src/utils/patientStorage.js
-
 const STORAGE_KEY = "patients";
 const BACKUP_KEY = `${STORAGE_KEY}_backup`; // patients_backup
 
