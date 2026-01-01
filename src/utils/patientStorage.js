@@ -1,5 +1,3 @@
-// src/utils/patientStorage.js
-
 const STORAGE_KEY = "patients";
 const BACKUP_KEY = `${STORAGE_KEY}_backup`; // patients_backup
 
