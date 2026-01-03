@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./PatientForm.css";
+import { formatDateDMY } from "../utils/dateFormat";
 
 const defaultValues = {
   idNumber: "",
   firstName: "",
   lastName: "",
   dob: "",
+  dobText: "",
   gender: "Other",
   street: "",
   city: "",
@@ -16,13 +18,35 @@ const defaultValues = {
   email: "",
 };
 
-function toDateInputValue(d) {
-  if (!d) return "";
-  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
 
-  const date = new Date(d);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+function toISODateOnly(value) {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function parseDMYToISODateOnly(dmy) {
+  const s = String(dmy || "").trim();
+  if (!s) return "";
+
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (!m) return "";
+
+  const dd = Number(m[1]);
+  const mm = Number(m[2]);
+  let yyyy = Number(m[3]);
+  if (yyyy < 100) yyyy += 2000;
+
+  const d = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
+  if (Number.isNaN(d.getTime())) return "";
+
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 function firstNonEmpty(...vals) {
@@ -41,9 +65,7 @@ function firstNonEmpty(...vals) {
 function normalizeInitialValues(initialValues) {
   if (!initialValues) return { ...defaultValues };
 
-  const addr = Array.isArray(initialValues.address)
-    ? initialValues.address[0]
-    : initialValues.address;
+  const addr = Array.isArray(initialValues.address) ? initialValues.address[0] : initialValues.address;
 
   const idNumber = firstNonEmpty(initialValues.idNumber, initialValues.id, "");
 
@@ -54,7 +76,9 @@ function normalizeInitialValues(initialValues) {
     initialValues.birthDateTime,
     ""
   );
-  const dob = toDateInputValue(dobRaw);
+
+  const dobISO = toISODateOnly(dobRaw);
+  const dobText = dobISO ? formatDateDMY(dobISO) : "";
 
   const addrLine0 = Array.isArray(addr?.line) ? addr.line[0] : undefined;
 
@@ -67,12 +91,7 @@ function normalizeInitialValues(initialValues) {
   );
 
   const city = firstNonEmpty(initialValues.city, addr?.city, addr?.town, "");
-  const zipCode = firstNonEmpty(
-    initialValues.zipCode,
-    addr?.zipCode,
-    addr?.postalCode,
-    ""
-  );
+  const zipCode = firstNonEmpty(initialValues.zipCode, addr?.zipCode, addr?.postalCode, "");
 
   const status = firstNonEmpty(
     initialValues.status,
@@ -82,13 +101,14 @@ function normalizeInitialValues(initialValues) {
 
   const conditions = Array.isArray(initialValues.conditions)
     ? initialValues.conditions.join(", ")
-    : initialValues.conditions || "";
+    : (initialValues.conditions || "");
 
   return {
     ...defaultValues,
     ...initialValues,
     idNumber,
-    dob,
+    dob: dobISO,
+    dobText,
     street,
     city,
     zipCode,
@@ -100,7 +120,8 @@ function normalizeInitialValues(initialValues) {
 function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
   const [values, setValues] = useState(defaultValues);
   const [errors, setErrors] = useState({});
-  const today = new Date().toISOString().split("T")[0];
+
+  const todayISO = useMemo(() => toISODateOnly(new Date()), []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -116,6 +137,22 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
   function handleChange(e) {
     const { name, value } = e.target;
     setValues((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handleDobTextChange(e) {
+    const nextText = e.target.value;
+    setValues((prev) => ({
+      ...prev,
+      dobText: nextText,
+    }));
+  }
+
+  function handleDobBlur() {
+    const iso = parseDMYToISODateOnly(values.dobText);
+    setValues((prev) => ({
+      ...prev,
+      dob: iso || prev.dob,
+    }));
   }
 
   function validate(v) {
@@ -144,7 +181,10 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
       e.email = "Email format is invalid.";
     }
 
-    if (v.dob && v.dob > today) {
+    const dobISO = v.dob || parseDMYToISODateOnly(v.dobText);
+    if (v.dobText && !dobISO) {
+      e.dob = "Date of birth must be DD/MM/YYYY.";
+    } else if (dobISO && dobISO > todayISO) {
       e.dob = "Date of birth cannot be in the future.";
     }
 
@@ -154,43 +194,52 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!validate(values)) return;
+
+    const dobISO = values.dob || parseDMYToISODateOnly(values.dobText);
+    const nextValues = { ...values, dob: dobISO };
+
+    if (!validate(nextValues)) return;
 
     const base = initialValues ? { ...initialValues } : {};
-    const trimmedIdNumber = values.idNumber.trim();
+    const trimmedIdNumber = nextValues.idNumber.trim();
 
     const prepared = {
       ...base,
-      ...values,
+      ...nextValues,
       _originalIdNumber: base.idNumber || base.id || trimmedIdNumber,
       idNumber: trimmedIdNumber,
       id: base.idNumber || base.id || trimmedIdNumber,
 
-      firstName: values.firstName.trim(),
-      lastName: values.lastName.trim(),
-      phone: values.phone.trim(),
-      email: values.email.trim(),
+      firstName: nextValues.firstName.trim(),
+      lastName: nextValues.lastName.trim(),
+      phone: nextValues.phone.trim(),
+      email: nextValues.email.trim(),
 
-      street: values.street.trim(),
-      city: values.city.trim(),
-      zipCode: values.zipCode.trim(),
+      street: nextValues.street.trim(),
+      city: nextValues.city.trim(),
+      zipCode: nextValues.zipCode.trim(),
 
-      status: values.status,
-      clinicalStatus: values.status,
-      dob: toDateInputValue(values.dob),
+      status: nextValues.status,
+      clinicalStatus: nextValues.status,
 
-      conditions: values.conditions
-        ? values.conditions
+      dob: nextValues.dob || "",
+
+      conditions: nextValues.conditions
+        ? nextValues.conditions
             .split(",")
             .map((c) => c.trim())
             .filter(Boolean)
         : [],
     };
 
+    delete prepared.dobText;
+
     onSubmit?.(prepared);
   }
 
   if (!isOpen) return null;
+
+  const dobPreview = values.dob ? formatDateDMY(values.dob) : (values.dobText ? formatDateDMY(values.dobText) : "");
 
   return (
     <div className="modal-backdrop">
@@ -261,13 +310,26 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
           <div className="form-row">
             <div className={`form-field ${errors.dob ? "has-error" : ""}`}>
               <label>Date of Birth</label>
+
               <input
-                type="date"
-                name="dob"
-                value={values.dob}
-                max={today}
-                onChange={handleChange}
+                type="text"
+                name="dobText"
+                value={values.dobText}
+                onChange={handleDobTextChange}
+                onBlur={handleDobBlur}
+                placeholder="DD/MM/YYYY"
+                inputMode="numeric"
+                dir="ltr"
               />
+
+              {dobPreview ? (
+                <div style={{ marginTop: 6 }}>
+                  <bdi dir="ltr" style={{ unicodeBidi: "isolate" }}>
+                    {dobPreview}
+                  </bdi>
+                </div>
+              ) : null}
+
               {errors.dob && <div className="field-error">{errors.dob}</div>}
             </div>
 
@@ -339,12 +401,7 @@ function PatientForm({ isOpen, onClose, onSubmit, initialValues }) {
           </div>
 
           <div className="form-actions">
-            {/* ✅ IMPORTANT: classes that your CSS expects */}
-            <button
-              type="button"
-              className="form-cancel-btn"
-              onClick={onClose}
-            >
+            <button type="button" className="form-cancel-btn" onClick={onClose}>
               Cancel
             </button>
 
