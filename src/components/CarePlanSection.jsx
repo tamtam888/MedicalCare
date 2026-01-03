@@ -3,6 +3,7 @@ import "./CarePlanSection.css";
 import CarePlanGoals from "./CarePlanGoals";
 import CarePlanExercises from "./CarePlanExercises";
 import { formatDateTimeDMY } from "../utils/dateFormat";
+import { toFhirCarePlanBundle } from "../utils/fhirCarePlan";
 
 function createId(prefix) {
   const id = globalThis.crypto?.randomUUID?.();
@@ -129,8 +130,20 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
 
   function exportDraft() {
     if (!draft) return;
-    const filename = `${patient?.idNumber || "patient"}_careplan.json`;
-    downloadJson(filename, draft);
+
+    // Build a FHIR Bundle (CarePlan + Goal + ServiceRequest + optional Patient)
+    const bundle = toFhirCarePlanBundle({
+      patient,
+      carePlanDraft: draft,
+      includePatient: true,
+    });
+
+    // Debug: verify you got a Bundle
+    console.log("FHIR CARE PLAN BUNDLE ✅", bundle);
+
+    // Download JSON
+    const filename = `${patient?.idNumber || "patient"}_careplan_fhir.bundle.json`;
+    downloadJson(filename, bundle);
   }
 
   function onGoalsChange(nextGoals) {

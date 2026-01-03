@@ -8,8 +8,8 @@ import {
   historyItemToObservation,
   reportToDiagnosticReport,
   hasMedplumSession,
-  ID_SYSTEM,
-} from "../utils/patientFhir";
+  ID_SYSTEM
+} from "../utils/fhirPatient.js";
 import { medplum } from "../medplumClient";
 
 const STORAGE_KEY = "patients";
