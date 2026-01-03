@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import "./CarePlanGoals.css";
-import { formatDateDMY, fromISODateInput, toISODateInput } from "../utils/dateFormat";
+import { formatDateDMY, parseFlexibleDate } from "../utils/dateFormat";
 
 function createId(prefix) {
   const id = globalThis.crypto?.randomUUID?.();
@@ -10,7 +10,7 @@ function createId(prefix) {
 const emptyDraft = {
   title: "",
   status: "Planned",
-  targetDate: "",
+  targetDateText: "",
   notes: "",
 };
 
@@ -23,7 +23,9 @@ export default function CarePlanGoals({ value = [], onChange }) {
 
   const sorted = useMemo(() => {
     const arr = Array.isArray(value) ? value : [];
-    return [...arr].sort((a, b) => String(a?.targetDate || "").localeCompare(String(b?.targetDate || "")));
+    return [...arr].sort((a, b) =>
+      String(a?.targetDate || "").localeCompare(String(b?.targetDate || ""))
+    );
   }, [value]);
 
   function openAdd() {
@@ -37,7 +39,7 @@ export default function CarePlanGoals({ value = [], onChange }) {
     setDraft({
       title: g.title || "",
       status: g.status || "Planned",
-      targetDate: g.targetDate ? toISODateInput(g.targetDate) : "",
+      targetDateText: g.targetDate ? formatDateDMY(g.targetDate) : "",
       notes: g.notes || "",
     });
     setIsOpen(true);
@@ -56,6 +58,10 @@ export default function CarePlanGoals({ value = [], onChange }) {
 
   function validate(d) {
     if (!String(d.title || "").trim()) return "Goal title is required.";
+    if (String(d.targetDateText || "").trim()) {
+      const parsed = parseFlexibleDate(d.targetDateText);
+      if (!parsed) return "Target date must be DD/MM/YYYY.";
+    }
     return null;
   }
 
@@ -66,15 +72,20 @@ export default function CarePlanGoals({ value = [], onChange }) {
       return;
     }
 
+    const tdText = String(draft.targetDateText || "").trim();
+    const parsedDate = tdText ? parseFlexibleDate(tdText) : null;
+
     const payload = {
       title: String(draft.title || "").trim(),
       status: String(draft.status || "Planned"),
-      targetDate: draft.targetDate ? fromISODateInput(draft.targetDate) : undefined,
+      targetDate: parsedDate ? parsedDate.toISOString() : undefined,
       notes: String(draft.notes || ""),
     };
 
     if (isEditing) {
-      const next = (value || []).map((x) => (x?.id === editingId ? { ...x, ...payload } : x));
+      const next = (value || []).map((x) =>
+        x?.id === editingId ? { ...x, ...payload } : x
+      );
       onChange(next);
       close();
       return;
@@ -88,6 +99,11 @@ export default function CarePlanGoals({ value = [], onChange }) {
       },
     ]);
     close();
+  }
+
+  function handleTargetDateChange(e) {
+    const formatted = autoFormatDMY(e.target.value);
+    setDraft((d) => ({ ...d, targetDateText: formatted }));
   }
 
   return (
@@ -105,25 +121,42 @@ export default function CarePlanGoals({ value = [], onChange }) {
         <div className="careplan-goals-list">
           {sorted.map((g) => {
             const td = g.targetDate ? formatDateDMY(g.targetDate) : "";
+            const status = g.status || "Planned";
+
             return (
               <div className="careplan-goal-item" key={g.id}>
                 <div className="careplan-goal-main">
                   <div className="careplan-goal-title">{g.title}</div>
+
                   <div className="careplan-goal-meta">
-                    <span className="careplan-goal-pill">{g.status || "Planned"}</span>
+                    <span className="careplan-goal-pill" data-status={status}>
+                      {status}
+                    </span>
+
                     <span className="careplan-goal-pill">
                       <strong>Target:</strong>{" "}
                       <bdi dir="ltr">{td || "—"}</bdi>
                     </span>
                   </div>
-                  {g.notes ? <div className="careplan-goal-notes">{g.notes}</div> : null}
+
+                  {g.notes ? (
+                    <div className="careplan-goal-notes">{g.notes}</div>
+                  ) : null}
                 </div>
 
                 <div className="careplan-goal-actions">
-                  <button type="button" className="careplan-goal-btn" onClick={() => openEdit(g)}>
+                  <button
+                    type="button"
+                    className="careplan-goal-btn"
+                    onClick={() => openEdit(g)}
+                  >
                     Edit
                   </button>
-                  <button type="button" className="careplan-goal-btn careplan-goal-danger" onClick={() => remove(g.id)}>
+                  <button
+                    type="button"
+                    className="careplan-goal-btn careplan-goal-danger"
+                    onClick={() => remove(g.id)}
+                  >
                     Delete
                   </button>
                 </div>
@@ -134,13 +167,24 @@ export default function CarePlanGoals({ value = [], onChange }) {
       )}
 
       {isOpen ? (
-        <div className="careplan-goals-modal-overlay" role="dialog" aria-modal="true" onMouseDown={(e) => {
-          if (e.target === e.currentTarget) close();
-        }}>
+        <div
+          className="careplan-goals-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) close();
+          }}
+        >
           <div className="careplan-goals-modal">
             <div className="careplan-goals-modal-header">
-              <div className="careplan-goals-modal-title">{isEditing ? "Edit goal" : "Add goal"}</div>
-              <button type="button" className="careplan-goals-modal-close" onClick={close}>
+              <div className="careplan-goals-modal-title">
+                {isEditing ? "Edit goal" : "Add goal"}
+              </div>
+              <button
+                type="button"
+                className="careplan-goals-modal-close"
+                onClick={close}
+              >
                 ✕
               </button>
             </div>
@@ -151,7 +195,9 @@ export default function CarePlanGoals({ value = [], onChange }) {
                 <input
                   className="inline-input"
                   value={draft.title}
-                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, title: e.target.value }))
+                  }
                   placeholder="e.g. Improve stair climbing tolerance"
                 />
               </label>
@@ -161,7 +207,9 @@ export default function CarePlanGoals({ value = [], onChange }) {
                 <select
                   className="inline-input"
                   value={draft.status}
-                  onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, status: e.target.value }))
+                  }
                 >
                   <option value="Planned">Planned</option>
                   <option value="In progress">In progress</option>
@@ -174,9 +222,11 @@ export default function CarePlanGoals({ value = [], onChange }) {
                 <span className="careplan-goals-label">Target date</span>
                 <input
                   className="inline-input"
-                  type="date"
-                  value={draft.targetDate}
-                  onChange={(e) => setDraft((d) => ({ ...d, targetDate: e.target.value }))}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD/MM/YYYY"
+                  value={draft.targetDateText}
+                  onChange={handleTargetDateChange}
                 />
               </label>
 
@@ -186,7 +236,9 @@ export default function CarePlanGoals({ value = [], onChange }) {
                   className="careplan-goals-textarea"
                   rows={3}
                   value={draft.notes}
-                  onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, notes: e.target.value }))
+                  }
                 />
               </label>
 

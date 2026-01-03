@@ -22,6 +22,13 @@ function fullName(p) {
   return name || "Unknown patient";
 }
 
+function getGenderNameClass(g) {
+  const s = String(g || "").toLowerCase().trim();
+  if (s === "female") return "patient-name-female";
+  if (s === "male") return "patient-name-male";
+  return "patient-name-other";
+}
+
 function createId(prefix) {
   const id = globalThis.crypto?.randomUUID?.();
   return id ? `${prefix}_${id}` : `${prefix}_${Date.now()}`;
@@ -88,13 +95,14 @@ function getAllActiveCarePlans(patients) {
     if (!patientId) return;
 
     const patientName = fullName(p);
+    const gender = p?.gender;
 
     const draft = p?.carePlanDraft;
     if (draft && typeof draft === "object") {
       rows.push({
-        kind: "draft",
         patientId,
         patientName,
+        patientGender: gender,
         carePlanId: String(draft.id || ""),
         title: String(draft.title || "Care plan"),
         updatedAt: draft.updatedAt || "",
@@ -108,9 +116,9 @@ function getAllActiveCarePlans(patients) {
     plans.forEach((cp) => {
       if (!cp || typeof cp !== "object") return;
       rows.push({
-        kind: "saved",
         patientId,
         patientName,
+        patientGender: gender,
         carePlanId: String(cp.id || ""),
         title: String(cp.title || "Care plan"),
         updatedAt: cp.updatedAt || "",
@@ -172,7 +180,7 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
             const json = await res.json();
             return {
               path,
-              category: String(json?.category || json?.title || "Template"),
+              title: String(json?.category || json?.title || "Template"),
               count: Array.isArray(json?.exercises) ? json.exercises.length : 0,
               raw: json,
             };
@@ -220,13 +228,13 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
   }
 
   function exportActive(item) {
-    const filename = `${item.patientId}_${item.kind}_careplan.json`;
+    const filename = `${item.patientId}_careplan.json`;
     downloadJson(filename, item.raw);
   }
 
   return (
     <div className="careplans-page">
-      <section className="patient-card">
+      <section className="patient-card careplans-card-outline">
         <div className="careplans-header">
           <div>
             <h2 className="section-title">Care plans</h2>
@@ -268,7 +276,7 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
       </section>
 
       {showTemplates ? (
-        <section className="patient-card">
+        <section className="patient-card careplans-card-outline">
           <div className="careplans-section-head">
             <h2 className="section-title">Templates</h2>
             <div className="careplans-count">{templates.length}</div>
@@ -279,19 +287,15 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
           ) : templates.length === 0 ? (
             <div className="careplans-empty">No templates found.</div>
           ) : (
-            <div className="careplans-list">
+            <div className="careplans-templates-grid">
               {templates.map((t) => (
-                <div className="careplans-row careplans-row-compact" key={t.path}>
-                  <div className="careplans-main">
-                    <div className="careplans-title">{t.category}</div>
-                    <div className="careplans-meta">
-                      <span className="careplans-pill">
-                        <strong>Exercises:</strong> {t.count}
-                      </span>
-                    </div>
+                <div className="careplans-template-tile" key={t.path}>
+                  <div className="careplans-tile-top">
+                    <div className="careplans-tile-title">{t.title}</div>
+                    <div className="careplans-mini-meta">Exercises: {t.count}</div>
                   </div>
 
-                  <div className="careplans-actions">
+                  <div className="careplans-tile-actions">
                     <a className="header-chip-btn careplans-link" href={t.path} download>
                       Download
                     </a>
@@ -307,7 +311,7 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
       ) : null}
 
       {showActive ? (
-        <section className="patient-card">
+        <section className="patient-card careplans-card-outline">
           <div className="careplans-section-head">
             <h2 className="section-title">Active care plans</h2>
             <div className="careplans-count">{activePlans.length}</div>
@@ -316,24 +320,24 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
           {activePlans.length === 0 ? (
             <div className="careplans-empty">No active care plans yet.</div>
           ) : (
-            <div className="careplans-list">
+            <div className="careplans-active-list">
               {activePlans.map((it) => (
-                <div className="careplans-row careplans-row-compact" key={`${it.kind}_${it.patientId}_${it.carePlanId}`}>
-                  <div className="careplans-main">
-                    <div className="careplans-title">
-                      {it.title} <span className="careplans-type">({it.kind})</span>
+                <div className="careplans-active-row" key={`${it.patientId}_${it.carePlanId}`}>
+                  <div className="careplans-active-main">
+                    <div className="careplans-active-title">Care plan</div>
+
+                    <div className="careplans-active-line">
+                      <span className={"careplans-patient-name " + getGenderNameClass(it.patientGender)}>
+                        {it.patientName}
+                      </span>
+                      <span className="careplans-patient-id">ID: {it.patientId}</span>
                     </div>
 
-                    <div className="careplans-meta">
-                      <span className="careplans-pill">
-                        <strong>Patient:</strong> {it.patientName} (ID: {it.patientId})
-                      </span>
-                      <span className="careplans-pill">
-                        <strong>Exercises:</strong> {it.exerciseCount}
-                      </span>
-                      <span className="careplans-pill">
-                        <strong>Updated:</strong>{" "}
-                        <bdi dir="ltr">{it.updatedAt ? formatDateTimeDMY(it.updatedAt) : "—"}</bdi>
+                    <div className="careplans-active-meta">
+                      <span className="careplans-meta-item">Exercises: {it.exerciseCount}</span>
+                      <span className="careplans-meta-item">Goals: {it.goalsCount}</span>
+                      <span className="careplans-meta-item">
+                        Updated: <bdi dir="ltr">{it.updatedAt ? formatDateTimeDMY(it.updatedAt) : "—"}</bdi>
                       </span>
                     </div>
                   </div>
@@ -362,7 +366,7 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
             if (e.target === e.currentTarget) closeAssign();
           }}
         >
-          <div className="careplans-modal">
+          <div className="careplans-modal careplans-card-outline">
             <div className="careplans-modal-header">
               <div className="careplans-modal-title">Assign template</div>
               <button type="button" className="careplans-modal-close" onClick={closeAssign}>
@@ -373,7 +377,7 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
             <div className="careplans-modal-body">
               <div className="careplans-field">
                 <div className="careplans-label">Template</div>
-                <div className="careplans-value">{selectedTemplate?.category || "—"}</div>
+                <div className="careplans-value">{selectedTemplate?.title || "—"}</div>
               </div>
 
               <div className="careplans-field">

@@ -81,14 +81,7 @@ function InlineEditable({ value, placeholder = "-", inputType = "text", classNam
 }
 
 function pickDobValue(p) {
-  return (
-    p?.dob ??
-    p?.dateOfBirth ??
-    p?.birthDate ??
-    p?.birthDateTime ??
-    p?.dobText ??
-    ""
-  );
+  return p?.dob ?? p?.dateOfBirth ?? p?.birthDate ?? p?.birthDateTime ?? p?.dobText ?? "";
 }
 
 function formatDobForHeader(p) {
@@ -326,7 +319,7 @@ export default function PatientDetailsPage({
         <RecordAudio selectedPatient={editablePatient} onSaveTranscription={onSaveTranscriptionLocal} />
       </section>
 
-      <section className="patient-card">
+      <section className="patient-card patient-careplan-card">
         <h2 className="section-title">Care plan</h2>
         <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} />
       </section>

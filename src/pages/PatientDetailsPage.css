@@ -624,3 +624,32 @@
     padding-inline: 0.7rem;
   }
 }
+.patient-careplan-card {
+  border: 1px solid rgba(143, 110, 255, 0.28);
+  box-shadow: 0 10px 26px rgba(143, 110, 255, 0.10);
+}
+
+.patient-careplan-card .header-chip-btn {
+  border-color: rgba(143, 110, 255, 0.55);
+  color: rgba(111, 74, 232, 1);
+  box-shadow: 0 8px 20px rgba(143, 110, 255, 0.10);
+}
+
+.patient-careplan-card .header-chip-btn:hover {
+  border-color: rgba(143, 110, 255, 0.75);
+  background: rgba(143, 110, 255, 0.08);
+}
+
+.patient-careplan-card .header-chip-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(143, 110, 255, 0.22),
+    0 10px 24px rgba(143, 110, 255, 0.12);
+}
+
+.patient-careplan-card .inline-input:focus,
+.patient-careplan-card .text-area:focus,
+.patient-careplan-card select:focus {
+  outline: none;
+  border-color: rgba(143, 110, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(143, 110, 255, 0.14);
+}
