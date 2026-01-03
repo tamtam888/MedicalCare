@@ -1,0 +1,37 @@
+{
+  "category": "Post-operative general activity",
+  "version": 1,
+  "updatedAt": "2026-01-03T08:45:00.000Z",
+  "exercises": [
+    {
+      "id": "lib_ankle_pumps",
+      "name": "Ankle Pumps",
+      "instructions": "Move ankles up and down to support circulation.",
+      "defaultFrequency": "Hourly",
+      "defaultSets": 1,
+      "defaultReps": 20
+    },
+    {
+      "id": "lib_deep_breathing",
+      "name": "Deep Breathing",
+      "instructions": "Slow deep breaths expanding the chest. Rest between breaths as needed.",
+      "defaultFrequency": "3x/day",
+      "defaultDurationMin": 5
+    },
+    {
+      "id": "lib_short_walks",
+      "name": "Short Walks",
+      "instructions": "Walk at an easy pace indoors or on a flat surface.",
+      "defaultFrequency": "2x/day",
+      "defaultDurationMin": 10
+    },
+    {
+      "id": "lib_sit_to_stand",
+      "name": "Sit-to-Stand",
+      "instructions": "Stand up from a chair using controlled movement, then sit down slowly.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 2,
+      "defaultReps": 8
+    }
+  ]
+}

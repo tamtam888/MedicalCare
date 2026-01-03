@@ -1,10 +1,10 @@
-// src/App.jsx
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { usePatients } from "./hooks/usePatients";
 import DashboardPage from "./pages/DashboardPage";
 import PatientsPage from "./pages/PatientsPage";
 import PatientDetailsPage from "./pages/PatientDetailsPage";
+import CarePlansPage from "./pages/CarePlansPage";
 import { medplum } from "./medplumClient";
 import Sidebar from "./components/Sidebar";
 import "./App.css";
@@ -33,8 +33,7 @@ function App() {
 
         if (code) {
           await medplum.processCode(code);
-          const cleanUrl =
-            window.location.origin + window.location.pathname;
+          const cleanUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, "", cleanUrl);
         }
 
@@ -109,9 +108,7 @@ function App() {
               className="primary-button medplum-header-button"
               onClick={handleConnectMedplum}
             >
-              {medplumProfile
-                ? "Medplum: Connected"
-                : "Connect to Medplum"}
+              {medplumProfile ? "Medplum: Connected" : "Connect to Medplum"}
             </button>
           </div>
         </header>
@@ -177,9 +174,9 @@ function App() {
             <Route
               path="/data/care-plan"
               element={
-                <SimplePage
-                  title="Care plans"
-                  text="Care plan data view. (Coming soon)"
+                <CarePlansPage
+                  patients={patientsState.patients}
+                  onUpdatePatient={patientsState.handleUpdatePatientInline}
                 />
               }
             />
@@ -235,10 +232,7 @@ function App() {
             />
 
             {/* catch-all: any unknown path -> patients list */}
-            <Route
-              path="*"
-              element={<Navigate to="/patients" replace />}
-            />
+            <Route path="*" element={<Navigate to="/patients" replace />} />
           </Routes>
         </main>
       </div>

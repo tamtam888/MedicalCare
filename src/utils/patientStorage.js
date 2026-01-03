@@ -1,5 +1,3 @@
-// src/utils/patientStorage.js
-
 const STORAGE_KEY = "patients";
 const BACKUP_KEYS = [
   "patientsBackup",
@@ -35,12 +33,48 @@ function normalizeHistory(history) {
   return [];
 }
 
+function normalizeExercises(exercises) {
+  if (!exercises) return [];
+  if (Array.isArray(exercises)) return exercises.filter(Boolean);
+  if (typeof exercises === "object") return Object.values(exercises).filter(Boolean);
+  return [];
+}
+
+function normalizeGoals(goals) {
+  if (!goals) return [];
+  if (Array.isArray(goals)) return goals.filter(Boolean);
+  if (typeof goals === "object") return Object.values(goals).filter(Boolean);
+  return [];
+}
+
+function normalizeCarePlan(cp) {
+  if (!cp || typeof cp !== "object") return null;
+  return {
+    ...cp,
+    goals: normalizeGoals(cp.goals),
+    exercises: normalizeExercises(cp.exercises),
+  };
+}
+
+function normalizeCarePlanDraft(cp) {
+  return normalizeCarePlan(cp);
+}
+
+function normalizeCarePlans(carePlans) {
+  if (!carePlans) return [];
+  if (Array.isArray(carePlans)) return carePlans.map(normalizeCarePlan).filter(Boolean);
+  if (typeof carePlans === "object") return Object.values(carePlans).map(normalizeCarePlan).filter(Boolean);
+  return [];
+}
+
 function normalizePatient(p) {
   if (!p || typeof p !== "object") return null;
   return {
     ...p,
     history: normalizeHistory(p.history),
     reports: ensureArray(p.reports).filter(Boolean),
+    carePlanDraft: normalizeCarePlanDraft(p.carePlanDraft),
+    carePlans: normalizeCarePlans(p.carePlans),
   };
 }
 

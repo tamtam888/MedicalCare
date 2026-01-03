@@ -1,0 +1,209 @@
+.careplans-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.careplans-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.careplans-subtitle {
+  opacity: 0.8;
+}
+
+.careplans-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.careplans-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.careplans-search {
+  width: min(560px, 100%);
+}
+
+.careplans-toggles {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.careplans-chip-active {
+  border-color: rgba(0, 0, 0, 0.22);
+}
+
+.careplans-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.careplans-count {
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.careplans-empty {
+  opacity: 0.8;
+  margin-top: 10px;
+}
+
+.careplans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.careplans-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.careplans-row-compact {
+  padding: 10px 12px;
+}
+
+.careplans-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.careplans-title {
+  font-weight: 700;
+}
+
+.careplans-type {
+  opacity: 0.7;
+  font-weight: 600;
+}
+
+.careplans-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.careplans-pill {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.9em;
+  opacity: 0.95;
+}
+
+.careplans-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.careplans-link {
+  text-decoration: none;
+}
+
+.careplans-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 9999;
+}
+
+.careplans-modal {
+  width: min(640px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 14px;
+}
+
+.careplans-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.careplans-modal-title {
+  font-weight: 700;
+}
+
+.careplans-modal-close {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.careplans-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.careplans-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.careplans-label {
+  opacity: 0.85;
+  font-size: 0.92em;
+}
+
+.careplans-value {
+  font-weight: 700;
+}
+
+.careplans-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .careplans-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .careplans-search {
+    width: 100%;
+  }
+
+  .careplans-toggles {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 680px) {
+  .careplans-row {
+    flex-direction: column;
+  }
+}
