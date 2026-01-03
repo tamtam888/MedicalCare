@@ -1,192 +1,117 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+// src/components/RecordAudio.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./RecordAudio.css";
+import { saveAudioBlob, deleteAudioBlob } from "../utils/audioStorage";
+
+function pickMimeType() {
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"];
+  return types.find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
+}
 
 function improveTranscription(text) {
   if (!text) return "";
   let result = text.trim().replace(/\s+/g, " ");
-  if (!/[.!?]$/.test(result)) {
-    result = `${result}.`;
-  }
+  if (!/[.!?]$/.test(result)) result += ".";
   return `Clinical summary: ${result.charAt(0).toUpperCase()}${result.slice(1)}`;
 }
 
-function base64ToBlob(base64, contentType) {
-  const byteCharacters = atob(base64);
-  const byteArrays = [];
-  const sliceSize = 512;
-
-  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-    const slice = byteCharacters.slice(offset, offset + sliceSize);
-    const byteNumbers = new Array(slice.length);
-
-    for (let i = 0; i < slice.length; i += 1) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-
-    const byteArray = new Uint8Array(byteNumbers);
-    byteArrays.push(byteArray);
-  }
-
-  return new Blob(byteArrays, { type: contentType });
-}
-
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result || "";
-      const base64 = typeof result === "string" ? result.split(",")[1] : "";
-      resolve(base64 || "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-function blobToDataURL(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-function RecordAudio({ selectedPatient, onSaveTranscription }) {
+export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
 
+  const [audioId, setAudioId] = useState(null);
   const [audioURL, setAudioURL] = useState("");
-  const [audioBlob, setAudioBlob] = useState(null);
-  const [audioDataURL, setAudioDataURL] = useState("");
-
   const [transcription, setTranscription] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recognitionRef = useRef(null);
+  const audioPreviewUrlRef = useRef("");
 
   const canUseSpeechRecognition =
-    typeof window !== "undefined" &&
-    (window.SpeechRecognition || window.webkitSpeechRecognition);
+    typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  const storageKeyBase = useMemo(() => {
-    if (!selectedPatient) return "medicalcare_default";
-    const id =
-      selectedPatient.idNumber ||
-      selectedPatient.id ||
-      selectedPatient.identifier ||
-      "patient";
-    return `medicalcare_${id}`;
+  const patientKey = useMemo(() => {
+    if (!selectedPatient) return null;
+    return selectedPatient.idNumber || selectedPatient.id || selectedPatient.identifier || null;
   }, [selectedPatient]);
 
-  const audioStorageKey = `${storageKeyBase}_audio`;
-  const transcriptionStorageKey = `${storageKeyBase}_transcription`;
-
-  useEffect(() => {
-    let urlToRevoke = "";
-
-    try {
-      if (typeof window === "undefined") return;
-
-      const storedAudio = window.localStorage.getItem(audioStorageKey);
-      const storedTranscription = window.localStorage.getItem(transcriptionStorageKey);
-
-      if (storedAudio) {
-        const blob = base64ToBlob(storedAudio, "audio/webm");
-        const url = URL.createObjectURL(blob);
-        urlToRevoke = url;
-
-        setAudioBlob(blob);
-        setAudioURL(url);
-        setAudioDataURL(`data:audio/webm;base64,${storedAudio}`);
-      } else {
-        setAudioBlob(null);
-        setAudioURL("");
-        setAudioDataURL("");
-      }
-
-      setTranscription(storedTranscription || "");
-    } catch (error) {
-      console.error("Failed to restore recording from storage", error);
-    }
-
-    return () => {
-      if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
-    };
-  }, [audioStorageKey, transcriptionStorageKey]);
-
   useEffect(() => {
     return () => {
-      stopMediaRecorder();
-      if (recognitionRef.current) {
+      try {
+        mediaRecorderRef.current?.stop();
+        mediaRecorderRef.current?.stream?.getTracks?.().forEach((t) => t.stop());
+      } catch {}
+      try {
+        recognitionRef.current?.stop();
+      } catch {}
+      if (audioPreviewUrlRef.current) {
         try {
-          recognitionRef.current.stop();
+          URL.revokeObjectURL(audioPreviewUrlRef.current);
         } catch {}
+        audioPreviewUrlRef.current = "";
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveAudioToStorage = async (blob) => {
-    if (typeof window === "undefined") return;
-    try {
-      const base64 = await blobToBase64(blob);
-      window.localStorage.setItem(audioStorageKey, base64);
-    } catch (error) {
-      console.error("Failed to save audio to storage", error);
+  const resetDraftUIOnly = () => {
+    if (audioPreviewUrlRef.current) {
+      try {
+        URL.revokeObjectURL(audioPreviewUrlRef.current);
+      } catch {}
+      audioPreviewUrlRef.current = "";
     }
+    setAudioURL("");
+    setAudioId(null);
+    setTranscription("");
+    setStatusMessage("");
   };
 
-  const saveTranscriptionToStorage = (text) => {
-    if (typeof window === "undefined") return;
+  const stopDictationIfRunning = () => {
+    if (!isDictating) return;
     try {
-      window.localStorage.setItem(transcriptionStorageKey, text || "");
-    } catch (error) {
-      console.error("Failed to save transcription to storage", error);
-    }
+      recognitionRef.current?.stop();
+    } catch {}
+    setIsDictating(false);
   };
 
   const handleStartRecording = async () => {
     if (!selectedPatient || isRecording) return;
 
+    stopDictationIfRunning();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
 
-      let recorder;
-      try {
-        recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
-      } catch {
-        recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      }
+      const mimeType = pickMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       recorder.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         audioChunksRef.current = [];
 
-        const url = URL.createObjectURL(blob);
-        const dataUrl = await blobToDataURL(blob);
+        const id = crypto?.randomUUID?.() ?? `a_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        await saveAudioBlob(id, blob);
 
-        if (audioURL) {
+        if (audioPreviewUrlRef.current) {
           try {
-            URL.revokeObjectURL(audioURL);
+            URL.revokeObjectURL(audioPreviewUrlRef.current);
           } catch {}
+          audioPreviewUrlRef.current = "";
         }
 
-        setAudioBlob(blob);
-        setAudioURL(url);
-        setAudioDataURL(dataUrl);
+        const url = URL.createObjectURL(blob);
+        audioPreviewUrlRef.current = url;
 
-        await saveAudioToStorage(blob);
-        setStatusMessage("Recording saved locally.");
+        setAudioId(id);
+        setAudioURL(url);
+        setStatusMessage("Recording saved.");
       };
 
       mediaRecorderRef.current = recorder;
@@ -195,41 +120,28 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
       setStatusMessage("Recording in progress...");
     } catch (error) {
       console.error("Microphone error:", error);
-      alert("Could not access microphone. Please check permissions.");
+      alert("Could not access microphone.");
       setStatusMessage("Microphone access failed.");
     }
   };
 
-  const stopMediaRecorder = () => {
-    if (mediaRecorderRef.current) {
-      try {
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-      } catch (error) {
-        console.error("Error stopping media recorder", error);
-      }
-      mediaRecorderRef.current = null;
-    }
+  const handleStopRecording = () => {
+    if (!mediaRecorderRef.current) return;
+    try {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+    } catch {}
+    mediaRecorderRef.current = null;
     setIsRecording(false);
   };
 
-  const handleStopRecording = () => {
-    stopMediaRecorder();
-    setStatusMessage("Recording stopped.");
-  };
-
   const handleToggleDictation = () => {
-    if (!canUseSpeechRecognition) {
-      alert("Speech recognition is not supported in this browser.");
-      return;
-    }
+    if (!canUseSpeechRecognition || !selectedPatient) return;
 
     if (isDictating) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
+      try {
+        recognitionRef.current?.stop();
+      } catch {}
       setIsDictating(false);
       setStatusMessage("Dictation stopped.");
       return;
@@ -243,27 +155,22 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
     recognition.continuous = true;
 
     recognition.onresult = (event) => {
-      let finalText = transcription || "";
+      let chunk = "";
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const transcript = result[0].transcript;
-        if (result.isFinal) {
-          finalText = `${finalText} ${transcript}`.trim();
-        }
+        const r = event.results[i];
+        if (r.isFinal) chunk += ` ${r[0].transcript}`;
       }
-      setTranscription(finalText);
-      saveTranscriptionToStorage(finalText);
+      if (chunk.trim()) {
+        setTranscription((prev) => `${(prev || "").trim()} ${chunk.trim()}`.trim());
+      }
     };
 
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
+    recognition.onerror = () => {
       setIsDictating(false);
       setStatusMessage("Dictation error.");
     };
 
-    recognition.onend = () => {
-      setIsDictating(false);
-    };
+    recognition.onend = () => setIsDictating(false);
 
     recognitionRef.current = recognition;
     recognition.start();
@@ -272,65 +179,51 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
   };
 
   const handleImprove = () => {
-    const text = transcription.trim();
-    if (!text) return;
-
-    const improved = improveTranscription(text);
-    setTranscription(improved);
-    saveTranscriptionToStorage(improved);
-    setStatusMessage("Transcription improved.");
+    const t = (transcription || "").trim();
+    if (!t) return;
+    setTranscription(improveTranscription(t));
   };
 
-  const handleClear = () => {
-    setTranscription("");
-    setAudioURL("");
-    setAudioBlob(null);
-    setAudioDataURL("");
-    setStatusMessage("Recording and transcription cleared.");
-
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(audioStorageKey);
-        window.localStorage.removeItem(transcriptionStorageKey);
-      } catch (error) {
-        console.error("Failed to clear storage", error);
-      }
+  const handleClear = async () => {
+    if (audioId) {
+      await deleteAudioBlob(audioId);
     }
+    resetDraftUIOnly();
+    setStatusMessage("Cleared.");
   };
 
-  const handleSave = async () => {
-    if (!selectedPatient || !onSaveTranscription) return;
+  const handleSave = () => {
+    if (!selectedPatient || typeof onSaveTranscription !== "function") return;
 
-    const text = transcription.trim();
-    const hasText = text.length > 0;
+    const text = (transcription || "").trim();
+    const hasAudio = Boolean(audioId);
 
-    let dataUrl = audioDataURL;
-    if (!dataUrl && audioBlob) {
-      try {
-        dataUrl = await blobToDataURL(audioBlob);
-        setAudioDataURL(dataUrl);
-      } catch (e) {
-        console.error("Failed to convert audio blob to data url", e);
-      }
-    }
-
-    const hasAudio = Boolean(dataUrl);
-
-    if (!hasText && !hasAudio) {
+    if (!text && !hasAudio) {
       alert("Nothing to save. Please record audio or add transcription text.");
       return;
     }
 
-    onSaveTranscription(text, dataUrl);
+    const payload = {
+      text,
+      audioId: audioId || null,
+      patientId: patientKey,
+      createdAt: Date.now(),
+    };
 
-    handleClear();
-    setStatusMessage("Saved to patient history and cleared from editor.");
+    try {
+      if (onSaveTranscription.length <= 1) onSaveTranscription(payload);
+      else onSaveTranscription(patientKey, text, audioId || null);
+
+      resetDraftUIOnly();
+      setStatusMessage("Saved to patient history.");
+    } catch (error) {
+      console.error("Failed to save transcription:", error);
+      alert("Failed to save. Please try again.");
+    }
   };
 
   const patientLabel = selectedPatient
-    ? `${selectedPatient.firstName || ""} ${selectedPatient.lastName || ""} (ID ${
-        selectedPatient.idNumber || ""
-      })`
+    ? `${selectedPatient.firstName || ""} ${selectedPatient.lastName || ""} (ID ${selectedPatient.idNumber || ""})`
     : "No patient selected";
 
   return (
@@ -354,9 +247,10 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
 
         <button
           type="button"
-          className="record-btn record-btn-secondary"
+          className={`record-btn record-btn-secondary ${isDictating ? "record-btn-active" : ""}`}
           onClick={handleToggleDictation}
-          disabled={!selectedPatient || !canUseSpeechRecognition}
+          disabled={!selectedPatient || !canUseSpeechRecognition || isRecording}
+          title={isRecording ? "Stop recording to start dictation" : ""}
         >
           {isDictating ? "Stop dictation" : "Start dictation"}
         </button>
@@ -370,11 +264,8 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
         <textarea
           className="transcription-textarea"
           value={transcription}
-          placeholder="Type or edit the session transcription here..."
-          onChange={(e) => {
-            setTranscription(e.target.value);
-            saveTranscriptionToStorage(e.target.value);
-          }}
+          placeholder="Type or edit the session transcription here."
+          onChange={(e) => setTranscription(e.target.value)}
         />
 
         <div className="record-footer-buttons">
@@ -395,7 +286,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
             type="button"
             className="record-footer-btn record-clear-btn"
             onClick={handleClear}
-            disabled={!transcription && !audioURL}
+            disabled={!transcription && !audioId}
           >
             Clear
           </button>
@@ -408,14 +299,7 @@ function RecordAudio({ selectedPatient, onSaveTranscription }) {
         </div>
       )}
 
-      <div className="record-status-line">
-        {canUseSpeechRecognition
-          ? "Browser dictation is enabled."
-          : "Speech recognition is not available in this browser."}
-        {statusMessage && ` ${statusMessage}`}
-      </div>
+      <div className="record-status-line">{statusMessage}</div>
     </div>
   );
 }
-
-export default RecordAudio;
