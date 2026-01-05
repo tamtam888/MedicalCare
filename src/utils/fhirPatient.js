@@ -24,7 +24,6 @@ export function toDateInputValue(d) {
   return date.toISOString().slice(0, 10);
 }
 
-/** ✅ NEW: returns first non-empty (trimmed) string / value */
 function firstNonEmpty(...vals) {
   for (const v of vals) {
     if (v === undefined || v === null) continue;
@@ -38,7 +37,6 @@ function firstNonEmpty(...vals) {
   return "";
 }
 
-// ✅ address can be object OR array (FHIR)
 function getAddr(p) {
   const addr = p?.address;
   return Array.isArray(addr) ? addr[0] : addr;
@@ -48,13 +46,7 @@ function pickStreet(p) {
   const addr = getAddr(p);
   const line0 = Array.isArray(addr?.line) ? addr.line[0] : undefined;
 
-  return firstNonEmpty(
-    p?.street,
-    addr?.street,
-    addr?.line1,
-    line0,
-    ""
-  );
+  return firstNonEmpty(p?.street, addr?.street, addr?.line1, line0, "");
 }
 
 function pickCity(p) {
@@ -74,14 +66,7 @@ export function normalizePatient(raw = {}) {
   const firstName = String(p.firstName ?? "").trim();
   const lastName = String(p.lastName ?? "").trim();
 
-  // ✅ FIX: ignore empty dob string and fallback to other DOB fields
-  const dobSource = firstNonEmpty(
-    p.dob,
-    p.dateOfBirth,
-    p.birthDate,
-    p.birthDateTime,
-    ""
-  );
+  const dobSource = firstNonEmpty(p.dob, p.dateOfBirth, p.birthDate, p.birthDateTime, "");
   const dob = toDateInputValue(dobSource);
 
   const street = String(pickStreet(p) ?? "").trim();
@@ -111,12 +96,9 @@ export function normalizePatient(raw = {}) {
     gender,
     status,
     clinicalStatus: p.clinicalStatus || status,
-
-    // keep flat fields for your UI
     street,
     city,
     zipCode,
-
     conditions,
     history: ensureArray(p.history),
     reports: ensureArray(p.reports),

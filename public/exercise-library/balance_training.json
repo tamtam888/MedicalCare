@@ -1,0 +1,39 @@
+{
+  "category": "Balance training",
+  "version": 1,
+  "updatedAt": "2026-01-03T11:20:00.000Z",
+  "exercises": [
+    {
+      "id": "lib_single_leg_stand",
+      "name": "Single Leg Stand",
+      "instructions": "Stand on one leg near support. Keep posture tall and steady breathing.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 3,
+      "defaultDurationMin": 1
+    },
+    {
+      "id": "lib_tandem_walk",
+      "name": "Tandem Walk",
+      "instructions": "Walk heel-to-toe in a straight line. Use light support if needed.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 2,
+      "defaultReps": 10
+    },
+    {
+      "id": "lib_weight_shift",
+      "name": "Weight Shifts",
+      "instructions": "Shift weight side-to-side slowly while keeping feet planted.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 2,
+      "defaultReps": 12
+    },
+    {
+      "id": "lib_clock_reach",
+      "name": "Clock Reach",
+      "instructions": "Stand on one leg and reach the other foot lightly to positions like a clock face.",
+      "defaultFrequency": "3x/week",
+      "defaultSets": 2,
+      "defaultReps": 8
+    }
+  ]
+}

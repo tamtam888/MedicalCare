@@ -1,0 +1,39 @@
+{
+  "category": "Knee rehabilitation",
+  "version": 1,
+  "updatedAt": "2026-01-03T10:00:00.000Z",
+  "exercises": [
+    {
+      "id": "lib_quad_sets",
+      "name": "Quad Sets",
+      "instructions": "Tighten the thigh muscle while the leg is straight. Hold 5 seconds, relax.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 3,
+      "defaultReps": 10
+    },
+    {
+      "id": "lib_straight_leg_raise",
+      "name": "Straight Leg Raise",
+      "instructions": "Keep knee straight, lift leg slowly, pause, then lower with control.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 3,
+      "defaultReps": 10
+    },
+    {
+      "id": "lib_heel_slides",
+      "name": "Heel Slides",
+      "instructions": "Slide heel toward hips to bend the knee, then return to start.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 3,
+      "defaultReps": 12
+    },
+    {
+      "id": "lib_terminal_knee_extension",
+      "name": "Terminal Knee Extension",
+      "instructions": "Straighten knee fully against light resistance, then return slowly.",
+      "defaultFrequency": "3x/week",
+      "defaultSets": 3,
+      "defaultReps": 12
+    }
+  ]
+}

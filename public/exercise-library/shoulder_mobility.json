@@ -1,0 +1,38 @@
+{
+  "category": "Shoulder mobility",
+  "version": 1,
+  "updatedAt": "2026-01-01T09:00:00.000Z",
+  "exercises": [
+    {
+      "id": "lib_pendulum",
+      "name": "Pendulum",
+      "instructions": "Lean forward with support and let the arm swing gently in small circles.",
+      "defaultFrequency": "2x/day",
+      "defaultDurationMin": 5
+    },
+    {
+      "id": "lib_wall_climb",
+      "name": "Wall Climb",
+      "instructions": "Walk fingers up the wall to a comfortable height, then down slowly.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 3,
+      "defaultReps": 8
+    },
+    {
+      "id": "lib_external_rotation",
+      "name": "External Rotation (Band)",
+      "instructions": "Elbow at side, rotate forearm outward against light band resistance.",
+      "defaultFrequency": "3x/week",
+      "defaultSets": 3,
+      "defaultReps": 12
+    },
+    {
+      "id": "lib_scapular_retraction",
+      "name": "Scapular Retraction",
+      "instructions": "Squeeze shoulder blades gently together, hold 3 seconds, relax.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 2,
+      "defaultReps": 12
+    }
+  ]
+}

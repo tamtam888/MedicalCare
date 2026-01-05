@@ -9,10 +9,19 @@ import {
   reportToDiagnosticReport,
   hasMedplumSession,
   ID_SYSTEM,
-} from "../utils/patientFhir";
+} from "../utils/fhirPatient.js";
 import { medplum } from "../medplumClient";
 
 const STORAGE_KEY = "patients";
+
+const normalizePatientPreserve = (patient) => {
+  const base = normalizePatient(patient);
+  return {
+    ...base,
+    history: ensureArray(patient?.history ?? base?.history),
+    reports: ensureArray(patient?.reports ?? base?.reports),
+  };
+};
 
 function parseStorageData(raw) {
   if (!raw) return null;
@@ -29,12 +38,12 @@ function loadPatientsFromLocalStorage() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = parseStorageData(raw);
-    if (parsed && parsed.length > 0) return parsed.map(normalizePatient);
+    if (parsed && parsed.length > 0) return parsed.map(normalizePatientPreserve);
 
     const backupRaw = window.localStorage.getItem(`${STORAGE_KEY}_backup`);
     const backupParsed = parseStorageData(backupRaw);
     if (backupParsed && backupParsed.length > 0) {
-      return backupParsed.map(normalizePatient);
+      return backupParsed.map(normalizePatientPreserve);
     }
 
     return [];
@@ -43,7 +52,7 @@ function loadPatientsFromLocalStorage() {
       const backupRaw = window.localStorage.getItem(`${STORAGE_KEY}_backup`);
       const backupParsed = parseStorageData(backupRaw);
       if (backupParsed && Array.isArray(backupParsed)) {
-        return backupParsed.map(normalizePatient);
+        return backupParsed.map(normalizePatientPreserve);
       }
     } catch {}
     return [];
@@ -53,7 +62,7 @@ function loadPatientsFromLocalStorage() {
 function savePatientsToLocalStorage(patients) {
   if (typeof window === "undefined") return;
 
-  const safe = Array.isArray(patients) ? patients.map(normalizePatient) : [];
+  const safe = Array.isArray(patients) ? patients.map(normalizePatientPreserve) : [];
   const json = JSON.stringify(safe);
 
   try {
@@ -141,7 +150,7 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
   ensureArray(prev).forEach((p) => {
     const key = trimId(p.idNumber || p.id || p.medplumId);
     if (!key) return;
-    map.set(key, normalizePatient(p));
+    map.set(key, normalizePatientPreserve(p));
   });
 
   ensureArray(incoming).forEach((imp) => {
@@ -149,8 +158,9 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
     if (!key) return;
 
     const existing = map.get(key);
-    const importedHistory = historyByIdNumber?.get?.(key);
-    const importedReports = reportsByIdNumber?.get?.(key);
+
+    const importedHistory = (historyByIdNumber?.get?.(key) ?? imp?.history) || [];
+    const importedReports = (reportsByIdNumber?.get?.(key) ?? imp?.reports) || [];
 
     if (existing) {
       const mergedHistory = [
@@ -185,7 +195,7 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
 
       map.set(
         key,
-        normalizePatient({
+        normalizePatientPreserve({
           ...existing,
           ...imp,
           idNumber: key,
@@ -196,7 +206,7 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
     } else {
       map.set(
         key,
-        normalizePatient({
+        normalizePatientPreserve({
           ...imp,
           idNumber: key,
           history: ensureArray(importedHistory),
@@ -206,15 +216,9 @@ function mergePatients(prev, incoming, historyByIdNumber, reportsByIdNumber) {
     }
   });
 
-  return Array.from(map.values()).map(normalizePatient);
+  return Array.from(map.values()).map(normalizePatientPreserve);
 }
 
-/**
- * IMPORTANT FIX:
- * - previous version removed "" for ALL string fields,
- *   which prevented clearing dob/street/city/zipCode.
- * - we allow empty strings for those fields so "delete value" is saved.
- */
 function cleanUpdate(obj) {
   const cleaned = {};
   const allowEmptyStringKeys = new Set(["dob", "street", "city", "zipCode"]);
@@ -224,10 +228,7 @@ function cleanUpdate(obj) {
 
     if (typeof value === "string") {
       const trimmed = value.trim();
-
-      // allow empty string for address/dob fields (so user can clear them)
       if (trimmed === "" && !allowEmptyStringKeys.has(key)) continue;
-
       cleaned[key] = trimmed;
       continue;
     }
@@ -262,7 +263,7 @@ export function usePatients() {
   const updatePatientsWithSave = (updater) => {
     setPatients((prev) => {
       const updated = typeof updater === "function" ? updater(prev) : updater;
-      const safe = Array.isArray(updated) ? updated.map(normalizePatient) : [];
+      const safe = Array.isArray(updated) ? updated.map(normalizePatientPreserve) : [];
       savePatientsToLocalStorage(safe);
       return safe;
     });
@@ -306,7 +307,7 @@ export function usePatients() {
       return;
     }
 
-    const newPatient = normalizePatient({
+    const newPatient = normalizePatientPreserve({
       ...formData,
       idNumber,
       id: formData?.id || idNumber,
@@ -335,16 +336,6 @@ export function usePatients() {
 
     const newIdNumber = trimId(updatedPatient.idNumber);
 
-    /**
-     * 🔧 BUGFIX:
-     * The previous code used updatedPatient.id as "old idNumber",
-     * but `id` can be Medplum id / something else, so the map() never matched the patient.
-     *
-     * We now determine the "old idNumber" from:
-     * 1) updatedPatient._originalIdNumber (if you add it in PatientForm - best)
-     * 2) editingPatient.idNumber (available because you setEditingPatient(patient) on edit)
-     * 3) fallback to updatedPatient.idNumber
-     */
     const oldIdNumber =
       trimId(updatedPatient._originalIdNumber) ||
       trimId(editingPatient?.idNumber) ||
@@ -357,7 +348,6 @@ export function usePatients() {
 
     const finalIdNumber = newIdNumber || oldIdNumber;
 
-    // Prevent duplicates if idNumber changed
     if (
       newIdNumber &&
       oldIdNumber &&
@@ -383,16 +373,13 @@ export function usePatients() {
         const matches = pid === oldIdNumber || pid === newIdNumber;
         if (!matches) return p;
 
-        updatedPatientRef = normalizePatient({
+        updatedPatientRef = normalizePatientPreserve({
           ...p,
           ...cleanedUpdate,
           idNumber: finalIdNumber,
-
-          // keep id stable, but don't let it break matching
           id: p.id || finalIdNumber,
         });
 
-        // don't persist helper field if it exists
         if (updatedPatientRef && "_originalIdNumber" in updatedPatientRef) {
           delete updatedPatientRef._originalIdNumber;
         }
@@ -474,7 +461,7 @@ export function usePatients() {
       prev.map((p) => {
         if (trimId(p.idNumber) !== trimmedId) return p;
 
-        updatedPatientRef = normalizePatient({
+        updatedPatientRef = normalizePatientPreserve({
           ...p,
           reports: [...ensureArray(p.reports), reportMeta],
           history: [
@@ -510,7 +497,7 @@ export function usePatients() {
         const nextReports = ensureArray(p.reports).filter((r) => r?.id !== reportId);
         const nextHistory = ensureArray(p.history).filter((h) => h?.id !== reportId);
 
-        return normalizePatient({
+        return normalizePatientPreserve({
           ...p,
           reports: nextReports,
           history: nextHistory,
@@ -520,7 +507,7 @@ export function usePatients() {
   };
 
   const handleExportPatients = () => {
-    const safe = ensureArray(patients).map(normalizePatient);
+    const safe = ensureArray(patients).map(normalizePatientPreserve);
     const json = JSON.stringify(safe, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -564,7 +551,15 @@ export function usePatients() {
             return;
           }
 
-          updatePatientsWithSave((prev) => mergePatients(prev, arr));
+          const prepared = ensureArray(arr).map((p) =>
+            normalizePatientPreserve({
+              ...p,
+              history: ensureArray(p?.history),
+              reports: ensureArray(p?.reports),
+            })
+          );
+
+          updatePatientsWithSave((prev) => mergePatients(prev, prepared));
           alert("Patients imported successfully!");
           return;
         }
@@ -577,7 +572,7 @@ export function usePatients() {
           (res) => res.resourceType === "DiagnosticReport"
         );
 
-        const importedPatients = patientResources.map(fromFhirPatient);
+        const importedPatients = patientResources.map(fromFhirPatient).map(normalizePatientPreserve);
 
         const historyByIdNumber = new Map();
         observationResources.forEach((obs) => {
@@ -673,7 +668,7 @@ export function usePatients() {
 
         newHistoryItemRef = historyItem;
 
-        updatedPatientRef = normalizePatient({
+        updatedPatientRef = normalizePatientPreserve({
           ...p,
           history: [...ensureArray(p.history), historyItem],
         });
@@ -737,7 +732,7 @@ export function usePatients() {
     }
 
     const confirmSync = confirm(
-      `This will sync ${patients.length} patients and all their data to Medplum.\n\nContinue?`
+      `This will sync ${patients.length} patients and their history/reports to Medplum. Continue?`
     );
     if (!confirmSync) return;
 

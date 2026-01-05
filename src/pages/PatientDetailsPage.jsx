@@ -5,6 +5,7 @@ import "./PatientDetailsPage.css";
 import RecordAudio from "../components/RecordAudio";
 import PatientHistory from "../components/PatientHistory";
 import AttachReports from "../components/AttachReports";
+import CarePlanSection from "../components/CarePlanSection";
 import { formatDateDMY, parseFlexibleDate } from "../utils/dateFormat";
 
 function buildFullName(p) {
@@ -80,14 +81,7 @@ function InlineEditable({ value, placeholder = "-", inputType = "text", classNam
 }
 
 function pickDobValue(p) {
-  return (
-    p?.dob ??
-    p?.dateOfBirth ??
-    p?.birthDate ??
-    p?.birthDateTime ??
-    p?.dobText ??
-    ""
-  );
+  return p?.dob ?? p?.dateOfBirth ?? p?.birthDate ?? p?.birthDateTime ?? p?.dobText ?? "";
 }
 
 function formatDobForHeader(p) {
@@ -323,6 +317,11 @@ export default function PatientDetailsPage({
       <section className="patient-card">
         <h2 className="section-title">Treatment transcription</h2>
         <RecordAudio selectedPatient={editablePatient} onSaveTranscription={onSaveTranscriptionLocal} />
+      </section>
+
+      <section className="patient-card patient-careplan-card">
+        <h2 className="section-title">Care plan</h2>
+        <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} />
       </section>
 
       <section className="patient-card">

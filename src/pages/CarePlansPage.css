@@ -1,0 +1,314 @@
+.careplans-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.careplans-card-outline {
+  border: 1px solid rgba(143, 110, 255, 0.25);
+  box-shadow: 0 10px 26px rgba(143, 110, 255, 0.08);
+}
+
+/* Purple button styling scoped to CarePlans only */
+.careplans-page .header-chip-btn {
+  border-color: rgba(143, 110, 255, 0.55);
+  color: rgba(111, 74, 232, 1);
+  box-shadow: 0 8px 20px rgba(143, 110, 255, 0.10);
+}
+
+.careplans-page .header-chip-btn:hover {
+  border-color: rgba(143, 110, 255, 0.75);
+  background: rgba(143, 110, 255, 0.08);
+}
+
+.careplans-page .header-chip-btn:active {
+  transform: translateY(0.5px);
+}
+
+.careplans-page .header-chip-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(143, 110, 255, 0.22), 0 10px 24px rgba(143, 110, 255, 0.12);
+}
+
+.careplans-page .careplans-link.header-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Keeps toggle buttons consistent */
+.careplans-chip-active {
+  border-color: rgba(143, 110, 255, 0.85);
+  background: rgba(143, 110, 255, 0.10);
+  box-shadow: 0 10px 24px rgba(143, 110, 255, 0.14);
+}
+
+.careplans-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.careplans-subtitle {
+  opacity: 0.8;
+}
+
+.careplans-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.careplans-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.careplans-search {
+  width: min(560px, 100%);
+}
+
+.careplans-toggles {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.careplans-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.careplans-count {
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.careplans-empty {
+  opacity: 0.8;
+  margin-top: 10px;
+}
+
+/* Templates grid */
+.careplans-templates-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.careplans-template-tile {
+  border: 1px solid rgba(143, 110, 255, 0.22);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(143, 110, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.careplans-tile-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.careplans-tile-title {
+  font-weight: 800;
+}
+
+.careplans-mini-meta {
+  opacity: 0.78;
+  font-size: 0.95em;
+}
+
+.careplans-tile-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.careplans-link {
+  text-decoration: none;
+}
+
+/* Active list */
+.careplans-active-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.careplans-active-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(143, 110, 255, 0.18);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.careplans-active-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.careplans-active-title {
+  font-weight: 800;
+}
+
+.careplans-active-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.careplans-patient-name {
+  font-weight: 800;
+}
+
+.patient-name-female {
+  color: #d84a5a;
+}
+
+.patient-name-male {
+  color: #2f6fed;
+}
+
+.patient-name-other {
+  color: #23a26d;
+}
+
+.careplans-patient-id {
+  opacity: 0.8;
+}
+
+.careplans-active-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  opacity: 0.9;
+}
+
+.careplans-meta-item {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.careplans-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+/* Modal */
+.careplans-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 12, 40, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 9999;
+}
+
+.careplans-modal {
+  width: min(640px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.careplans-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.careplans-modal-title {
+  font-weight: 800;
+}
+
+.careplans-modal-close {
+  border: 1px solid rgba(143, 110, 255, 0.55);
+  color: rgba(111, 74, 232, 1);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(143, 110, 255, 0.10);
+}
+
+.careplans-modal-close:hover {
+  border-color: rgba(143, 110, 255, 0.75);
+  background: rgba(143, 110, 255, 0.08);
+}
+
+.careplans-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.careplans-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.careplans-label {
+  opacity: 0.85;
+  font-size: 0.92em;
+}
+
+.careplans-value {
+  font-weight: 800;
+}
+
+.careplans-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 980px) {
+  .careplans-templates-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .careplans-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .careplans-search {
+    width: 100%;
+  }
+
+  .careplans-toggles {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 680px) {
+  .careplans-active-row {
+    flex-direction: column;
+  }
+}

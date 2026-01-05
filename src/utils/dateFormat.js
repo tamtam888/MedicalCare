@@ -60,3 +60,15 @@ export function fromISODateInput(value) {
   const d = new Date(`${s}T12:00:00`);
   return isDate(d) ? d.toISOString() : new Date().toISOString();
 }
+export function autoFormatDMY(input) {
+  const raw = String(input || "");
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+
+  const dd = digits.slice(0, 2);
+  const mm = digits.slice(2, 4);
+  const yyyy = digits.slice(4, 8);
+
+  if (digits.length <= 2) return dd;
+  if (digits.length <= 4) return `${dd}/${mm}`;
+  return `${dd}/${mm}/${yyyy}`;
+}

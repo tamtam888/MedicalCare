@@ -1,0 +1,260 @@
+.careplan-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.careplan-goals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.careplan-goals-title {
+  font-weight: 700;
+}
+
+.careplan-goals-empty {
+  opacity: 0.8;
+}
+
+.careplan-goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.careplan-goal-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.careplan-goal-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.careplan-goal-title {
+  font-weight: 700;
+}
+
+.careplan-goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.careplan-goal-pill {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.9em;
+  opacity: 0.95;
+}
+
+.careplan-goal-notes {
+  white-space: pre-wrap;
+  opacity: 0.9;
+}
+
+.careplan-goal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.careplan-goal-btn {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.careplan-goal-danger {
+  border-color: rgba(220, 53, 69, 0.35);
+}
+
+.careplan-goals-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 9999;
+}
+
+.careplan-goals-modal {
+  width: min(640px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 14px;
+}
+
+.careplan-goals-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.careplan-goals-modal-title {
+  font-weight: 700;
+}
+
+.careplan-goals-modal-close {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.careplan-goals-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.careplan-goals-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.careplan-goals-label {
+  font-size: 0.92em;
+  opacity: 0.9;
+}
+
+.careplan-goals-textarea {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.careplan-goals-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 680px) {
+  .careplan-goal-item {
+    flex-direction: column;
+  }
+}
+/* Goals visual separation (professional, subtle) */
+.careplan-goals {
+  border: 1px solid rgba(143, 110, 255, 0.18);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(143, 110, 255, 0.04);
+}
+
+.careplan-goals-header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(143, 110, 255, 0.14);
+  margin-bottom: 10px;
+}
+
+.careplan-goal-item {
+  border: 1px solid rgba(143, 110, 255, 0.16);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.careplan-goal-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: rgba(143, 110, 255, 0.65);
+}
+
+.careplan-goal-title {
+  font-weight: 800;
+}
+
+.careplan-goal-meta {
+  gap: 8px;
+}
+
+.careplan-goal-pill {
+  border: 1px solid rgba(143, 110, 255, 0.18);
+  background: rgba(143, 110, 255, 0.06);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+/* Status-specific pills (optional but looks pro) */
+.careplan-goal-pill[data-status="Planned"] {
+  background: rgba(143, 110, 255, 0.07);
+  border-color: rgba(143, 110, 255, 0.22);
+}
+
+.careplan-goal-pill[data-status="In progress"] {
+  background: rgba(47, 111, 237, 0.08);
+  border-color: rgba(47, 111, 237, 0.22);
+}
+
+.careplan-goal-pill[data-status="Achieved"] {
+  background: rgba(35, 162, 109, 0.10);
+  border-color: rgba(35, 162, 109, 0.22);
+}
+
+.careplan-goal-pill[data-status="On hold"] {
+  background: rgba(216, 74, 90, 0.08);
+  border-color: rgba(216, 74, 90, 0.22);
+}
+
+.careplan-goal-notes {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(143, 110, 255, 0.05);
+  border: 1px solid rgba(143, 110, 255, 0.14);
+  opacity: 0.92;
+}
+
+/* Buttons inside goals align with purple theme */
+.careplan-goals .header-chip-btn,
+.careplan-goal-btn {
+  border-color: rgba(143, 110, 255, 0.55);
+  color: rgba(111, 74, 232, 1);
+  box-shadow: 0 8px 20px rgba(143, 110, 255, 0.10);
+}
+
+.careplan-goals .header-chip-btn:hover,
+.careplan-goal-btn:hover {
+  border-color: rgba(143, 110, 255, 0.75);
+  background: rgba(143, 110, 255, 0.08);
+}
+
+.careplan-goal-danger {
+  border-color: rgba(216, 74, 90, 0.35);
+  color: rgba(216, 74, 90, 1);
+  box-shadow: none;
+}
+
+.careplan-goal-danger:hover {
+  background: rgba(216, 74, 90, 0.08);
+  border-color: rgba(216, 74, 90, 0.55);
+}

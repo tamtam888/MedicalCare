@@ -1,0 +1,39 @@
+{
+  "category": "Low back pain",
+  "version": 1,
+  "updatedAt": "2026-01-02T15:30:00.000Z",
+  "exercises": [
+    {
+      "id": "lib_pelvic_tilt",
+      "name": "Pelvic Tilt",
+      "instructions": "Gently flatten the lower back toward the surface by tightening the core.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 3,
+      "defaultReps": 12
+    },
+    {
+      "id": "lib_knees_to_chest",
+      "name": "Knees to Chest",
+      "instructions": "Bring knees toward chest until a mild stretch is felt. Breathe normally.",
+      "defaultFrequency": "Daily",
+      "defaultSets": 2,
+      "defaultReps": 10
+    },
+    {
+      "id": "lib_bird_dog",
+      "name": "Bird Dog",
+      "instructions": "From hands and knees, extend opposite arm and leg, keep trunk stable, return slowly.",
+      "defaultFrequency": "3x/week",
+      "defaultSets": 3,
+      "defaultReps": 8
+    },
+    {
+      "id": "lib_glute_bridge",
+      "name": "Glute Bridge",
+      "instructions": "Lift hips by squeezing glutes, keep ribs down, lower with control.",
+      "defaultFrequency": "3x/week",
+      "defaultSets": 3,
+      "defaultReps": 10
+    }
+  ]
+}
