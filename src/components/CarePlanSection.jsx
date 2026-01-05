@@ -1,17 +1,22 @@
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./CarePlanSection.css";
 import CarePlanGoals from "./CarePlanGoals";
 import CarePlanExercises from "./CarePlanExercises";
 import { formatDateTimeDMY } from "../utils/dateFormat";
-import { toFhirCarePlanBundle } from "../utils/fhirCarePlan";
+import {
+  toFhirCarePlanBundle,
+  downloadJson as downloadFhirJson,
+} from "../utils/fhirCarePlan";
 
 function createId(prefix) {
   const id = globalThis.crypto?.randomUUID?.();
   return id ? `${prefix}_${id}` : `${prefix}_${Date.now()}`;
 }
 
-function downloadJson(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+function downloadJsonInternal(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -23,7 +28,6 @@ function downloadJson(filename, data) {
 }
 
 function normalizeImportedGoals(goalsRaw) {
-  if (!goalsRaw) return [];
   if (!Array.isArray(goalsRaw)) return [];
   return goalsRaw
     .filter(Boolean)
@@ -38,7 +42,6 @@ function normalizeImportedGoals(goalsRaw) {
 }
 
 function normalizeImportedExercises(exercisesRaw) {
-  if (!exercisesRaw) return [];
   if (!Array.isArray(exercisesRaw)) return [];
   return exercisesRaw
     .filter(Boolean)
@@ -59,22 +62,31 @@ function normalizeImportedExercises(exercisesRaw) {
 function normalizeImportedCarePlan(obj) {
   if (!obj || typeof obj !== "object") return null;
 
-  const title = obj.title ? String(obj.title) : obj.category ? String(obj.category) : "Care plan";
-  const goals = normalizeImportedGoals(obj.goals);
-  const exercises = normalizeImportedExercises(obj.exercises);
-
   return {
     id: obj.id || createId("cp"),
-    title: title || "Care plan",
+    title: String(obj.title || "Care plan"),
     updatedAt: obj.updatedAt || new Date().toISOString(),
-    goals,
-    exercises,
+    goals: normalizeImportedGoals(obj.goals),
+    exercises: normalizeImportedExercises(obj.exercises),
   };
 }
 
 export default function CarePlanSection({ patient, onUpdatePatient }) {
   const fileRef = useRef(null);
   const draft = patient?.carePlanDraft || null;
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (exportRef.current && !exportRef.current.contains(e.target)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   const meta = useMemo(() => {
     return {
@@ -85,8 +97,7 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
   }, [draft]);
 
   function updateDraft(nextDraft) {
-    if (!onUpdatePatient) return;
-    onUpdatePatient({
+    onUpdatePatient?.({
       ...patient,
       carePlanDraft: nextDraft,
     });
@@ -103,7 +114,7 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
   }
 
   function clearDraft() {
-    if (!confirm("Delete the current care plan draft?")) return;
+    if (!window.confirm("Delete the current care plan draft?")) return;
     updateDraft(null);
   }
 
@@ -112,58 +123,52 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
     if (!file) return;
 
     try {
-      const now = new Date().toISOString();
-      const text = await file.text();
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(await file.text());
       const normalized = normalizeImportedCarePlan(parsed);
-      if (!normalized) {
-        alert("Invalid care plan file.");
-        return;
-      }
-      updateDraft({ ...normalized, updatedAt: now });
+      if (!normalized) throw new Error();
+      updateDraft({ ...normalized, updatedAt: new Date().toISOString() });
     } catch {
-      alert("Failed to import care plan.");
+      alert("Invalid care plan file.");
     } finally {
       if (e.target) e.target.value = "";
     }
   }
 
-  function exportDraft() {
+  function exportInternal() {
+    if (!draft) return;
+    const filename = `${patient?.idNumber || "patient"}_careplan.internal.json`;
+    downloadJsonInternal(filename, draft);
+  }
+
+  function exportFhir() {
     if (!draft) return;
 
-    // Build a FHIR Bundle (CarePlan + Goal + ServiceRequest + optional Patient)
     const bundle = toFhirCarePlanBundle({
       patient,
       carePlanDraft: draft,
       includePatient: true,
     });
 
-    // Debug: verify you got a Bundle
-    console.log("FHIR CARE PLAN BUNDLE ✅", bundle);
-
-    // Download JSON
-    const filename = `${patient?.idNumber || "patient"}_careplan_fhir.bundle.json`;
-    downloadJson(filename, bundle);
+    const filename = `${patient?.idNumber || "patient"}_careplan.fhir.bundle.json`;
+    downloadFhirJson(filename, bundle);
   }
 
   function onGoalsChange(nextGoals) {
-    const next = {
-      ...(draft || { id: createId("cp"), title: "Care plan" }),
+    updateDraft({
+      ...(draft || createDraft()),
       goals: nextGoals,
-      exercises: Array.isArray(draft?.exercises) ? draft.exercises : [],
+      exercises: draft?.exercises || [],
       updatedAt: new Date().toISOString(),
-    };
-    updateDraft(next);
+    });
   }
 
   function onExercisesChange(nextExercises) {
-    const next = {
-      ...(draft || { id: createId("cp"), title: "Care plan" }),
-      goals: Array.isArray(draft?.goals) ? draft.goals : [],
+    updateDraft({
+      ...(draft || createDraft()),
+      goals: draft?.goals || [],
       exercises: nextExercises,
       updatedAt: new Date().toISOString(),
-    };
-    updateDraft(next);
+    });
   }
 
   return (
@@ -171,9 +176,41 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
       <div className="careplan-actions">
         {draft ? (
           <>
-            <button type="button" className="header-chip-btn" onClick={exportDraft}>
-              Export care plan
-            </button>
+            <div className="export-dropdown" ref={exportRef}>
+              <button
+                type="button"
+                className="header-chip-btn"
+                onClick={() => setExportOpen((v) => !v)}
+              >
+                Export ▾
+              </button>
+
+              {exportOpen && (
+                <div className="export-menu">
+                  <button
+                    type="button"
+                    className="export-menu-item"
+                    onClick={() => {
+                      setExportOpen(false);
+                      exportInternal();
+                    }}
+                  >
+                    Export as MedicalCare JSON
+                  </button>
+
+                  <button
+                    type="button"
+                    className="export-menu-item"
+                    onClick={() => {
+                      setExportOpen(false);
+                      exportFhir();
+                    }}
+                  >
+                    Export as FHIR Bundle
+                  </button>
+                </div>
+              )}
+            </div>
 
             <label className="header-chip-btn careplan-import-label">
               Import care plan
@@ -186,7 +223,11 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
               />
             </label>
 
-            <button type="button" className="header-chip-btn careplan-danger" onClick={clearDraft}>
+            <button
+              type="button"
+              className="header-chip-btn careplan-danger"
+              onClick={clearDraft}
+            >
               Delete draft
             </button>
           </>
