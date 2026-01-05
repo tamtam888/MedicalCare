@@ -1,3 +1,4 @@
+// src/utils/patientStorage.js
 const STORAGE_KEY = "patients";
 const BACKUP_KEYS = [
   "patientsBackup",
@@ -9,8 +10,15 @@ const BACKUP_KEYS = [
 
 const isDev = import.meta.env.DEV;
 
+function isBadRaw(raw) {
+  const s = String(raw ?? "").trim();
+  return s === "" || s === "null" || s === "undefined";
+}
+
 function safeParseArray(raw, label) {
-  if (!raw) return null;
+  if (raw === null || raw === undefined) return null;
+  if (isBadRaw(raw)) return null;
+
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed;
@@ -27,18 +35,10 @@ function ensureArray(v) {
 }
 
 function normalizeHistory(history) {
-  let arr = [];
-  if (!history) arr = [];
-  else if (Array.isArray(history)) arr = history.filter(Boolean);
-  else if (typeof history === "object") arr = Object.values(history).filter(Boolean);
-
-  arr.sort((a, b) => {
-    const da = Date.parse(a?.date || "") || 0;
-    const db = Date.parse(b?.date || "") || 0;
-    return db - da;
-  });
-
-  return arr;
+  if (!history) return [];
+  if (Array.isArray(history)) return history.filter(Boolean);
+  if (typeof history === "object") return Object.values(history).filter(Boolean);
+  return [];
 }
 
 function normalizeExercises(exercises) {
@@ -71,32 +71,17 @@ function normalizeCarePlanDraft(cp) {
 function normalizeCarePlans(carePlans) {
   if (!carePlans) return [];
   if (Array.isArray(carePlans)) return carePlans.map(normalizeCarePlan).filter(Boolean);
-  if (typeof carePlans === "object") {
+  if (typeof carePlans === "object")
     return Object.values(carePlans).map(normalizeCarePlan).filter(Boolean);
-  }
   return [];
 }
 
 function normalizePatient(p) {
   if (!p || typeof p !== "object") return null;
-
-  const legacyHistory =
-    p.history ??
-    p.historyItems ??
-    p.patientHistory ??
-    p.timeline ??
-    null;
-
-  const legacyReports =
-    p.reports ??
-    p.medicalReports ??
-    p.files ??
-    null;
-
   return {
     ...p,
-    history: normalizeHistory(legacyHistory),
-    reports: ensureArray(legacyReports).filter(Boolean),
+    history: normalizeHistory(p.history),
+    reports: ensureArray(p.reports).filter(Boolean),
     carePlanDraft: normalizeCarePlanDraft(p.carePlanDraft),
     carePlans: normalizeCarePlans(p.carePlans),
   };
@@ -107,39 +92,16 @@ function normalizePatients(patients) {
   return patients.map(normalizePatient).filter(Boolean);
 }
 
-function getExistingCount() {
-  const primary = safeParseArray(window.localStorage.getItem(STORAGE_KEY), STORAGE_KEY);
-  if (primary && primary.length > 0) return primary.length;
-
-  for (const key of BACKUP_KEYS) {
-    const arr = safeParseArray(window.localStorage.getItem(key), key);
-    if (arr && arr.length > 0) return arr.length;
-  }
-
-  return 0;
-}
-
-function writeAll(patients, options = {}) {
-  const { allowEmptySave = false, updateBackups = true } = options;
-
+function writeAll(patients) {
   const safe = normalizePatients(patients);
-  const existingCount = getExistingCount();
-
-  if (!allowEmptySave && existingCount > 0 && safe.length === 0) {
-    if (isDev) console.warn("[patientStorage] Prevented empty save");
-    return;
-  }
-
   const json = JSON.stringify(safe);
-  window.localStorage.setItem(STORAGE_KEY, json);
 
-  if (updateBackups && (safe.length > 0 || allowEmptySave)) {
-    window.localStorage.setItem("patients:backup", json);
-    window.localStorage.setItem("patients_backup", json);
-    window.localStorage.setItem("patientsBackup", json);
-    window.localStorage.setItem("patients:main", json);
-    window.localStorage.setItem("patients_main", json);
-  }
+  window.localStorage.setItem(STORAGE_KEY, json);
+  window.localStorage.setItem("patients:backup", json);
+  window.localStorage.setItem("patients_backup", json);
+  window.localStorage.setItem("patientsBackup", json);
+  window.localStorage.setItem("patients:main", json);
+  window.localStorage.setItem("patients_main", json);
 
   if (isDev) console.log("[patientStorage] Saved patients:", safe.length);
 }
@@ -148,15 +110,17 @@ export function loadPatientsFromStorage() {
   try {
     if (typeof window === "undefined") return [];
 
-    const primary = safeParseArray(window.localStorage.getItem(STORAGE_KEY), STORAGE_KEY);
-    if (primary && primary.length > 0) return normalizePatients(primary);
+    const rawPrimary = window.localStorage.getItem(STORAGE_KEY);
+    const primary = safeParseArray(rawPrimary, STORAGE_KEY);
+    if (primary) return normalizePatients(primary);
 
     for (const key of BACKUP_KEYS) {
-      const arr = safeParseArray(window.localStorage.getItem(key), key);
-      if (arr && arr.length > 0) {
+      const raw = window.localStorage.getItem(key);
+      const arr = safeParseArray(raw, key);
+      if (arr) {
         const normalized = normalizePatients(arr);
         try {
-          writeAll(normalized, { allowEmptySave: false, updateBackups: true });
+          writeAll(normalized);
           if (isDev) console.log(`[patientStorage] Migrated from ${key} -> ${STORAGE_KEY}`);
         } catch {}
         return normalized;
@@ -170,13 +134,14 @@ export function loadPatientsFromStorage() {
   }
 }
 
-export function savePatientsToStorage(patients, options = {}) {
+export function savePatientsToStorage(patients) {
   try {
     if (typeof window === "undefined") return;
-    writeAll(patients, {
-      allowEmptySave: Boolean(options.allowEmptySave),
-      updateBackups: options.updateBackups !== false,
-    });
+    if (!Array.isArray(patients)) {
+      if (isDev) console.warn("[patientStorage] Refusing to save non-array patients value:", patients);
+      return;
+    }
+    writeAll(patients);
   } catch (error) {
     console.error("[patientStorage] Failed to save patients", error);
   }

@@ -1,4 +1,3 @@
-// src/utils/fhirCarePlan.js
 import { ID_SYSTEM, normalizePatient, trimId } from "./fhirPatient.js";
 import { parseFlexibleDate, toISODateInput } from "./dateFormat.js";
 
@@ -41,21 +40,21 @@ function extInt(url, v) {
   return { url, valueInteger: Math.trunc(n) };
 }
 
-export function toFhirGoal(goal, patientRef, goalFullUrl, carePlanRef) {
+export function toFhirGoal(goal, patientRef, goalFullUrl) {
   const title = String(goal?.title || "").trim();
   const dueDate = ensureIsoDateOnly(goal?.targetDate);
 
-  const resource = {
-    resourceType: "Goal",
-    lifecycleStatus: mapGoalStatusToFhir(goal?.status),
-    description: { text: title || "Goal" },
-    subject: patientRef,
-    target: dueDate ? [{ dueDate }] : undefined,
-    note: goal?.notes ? [{ text: String(goal.notes) }] : undefined,
-    addresses: carePlanRef ? [{ reference: carePlanRef }] : undefined,
+  return {
+    fullUrl: goalFullUrl,
+    resource: {
+      resourceType: "Goal",
+      lifecycleStatus: mapGoalStatusToFhir(goal?.status),
+      description: { text: title || "Goal" },
+      subject: patientRef,
+      target: dueDate ? [{ dueDate }] : undefined,
+      note: goal?.notes ? [{ text: String(goal.notes) }] : undefined,
+    },
   };
-
-  return { fullUrl: goalFullUrl, resource };
 }
 
 export function toFhirExercise(exercise, patientRef, exerciseFullUrl, carePlanRef) {
@@ -73,18 +72,19 @@ export function toFhirExercise(exercise, patientRef, exerciseFullUrl, carePlanRe
   if (instructions) noteLines.push(instructions);
   if (frequency) noteLines.push(`Frequency: ${frequency}`);
 
-  const resource = {
-    resourceType: "ServiceRequest",
-    status: "active",
-    intent: "plan",
-    subject: patientRef,
-    basedOn: carePlanRef ? [{ reference: carePlanRef }] : undefined,
-    code: { text: name || "Exercise" },
-    note: noteLines.length ? [{ text: noteLines.join("\n") }] : undefined,
-    extension: extensions.length ? extensions : undefined,
+  return {
+    fullUrl: exerciseFullUrl,
+    resource: {
+      resourceType: "ServiceRequest",
+      status: "active",
+      intent: "plan",
+      subject: patientRef,
+      basedOn: carePlanRef ? [{ reference: carePlanRef }] : undefined,
+      code: { text: name || "Exercise" },
+      note: noteLines.length ? [{ text: noteLines.join("\n") }] : undefined,
+      extension: extensions.length ? extensions : undefined,
+    },
   };
-
-  return { fullUrl: exerciseFullUrl, resource };
 }
 
 export function toFhirCarePlanBundle({ patient, carePlanDraft, includePatient = true } = {}) {
@@ -107,16 +107,6 @@ export function toFhirCarePlanBundle({ patient, carePlanDraft, includePatient = 
           ],
           gender: p.gender ? String(p.gender).toLowerCase() : undefined,
           birthDate: p.dob || undefined,
-          address:
-            p.street || p.city || p.zipCode
-              ? [
-                  {
-                    line: p.street ? [p.street] : undefined,
-                    city: p.city || undefined,
-                    postalCode: p.zipCode || undefined,
-                  },
-                ]
-              : undefined,
         },
       }
     : null;
@@ -129,42 +119,50 @@ export function toFhirCarePlanBundle({ patient, carePlanDraft, includePatient = 
   const carePlanFullUrl = `urn:uuid:careplan-${uuid()}`;
   const carePlanRef = carePlanFullUrl;
 
-  const lastUpdated =
-    carePlanDraft?.lastUpdated ||
-    carePlanDraft?.updatedAt ||
-    carePlanDraft?.periodStart ||
-    new Date().toISOString();
+  const goalEntries = goals.map((g) =>
+    toFhirGoal(g, patientRef, `urn:uuid:goal-${uuid()}`)
+  );
 
-  const goalEntries = goals.map((g) => {
-    const goalFullUrl = `urn:uuid:goal-${uuid()}`;
-    return toFhirGoal(g, patientRef, goalFullUrl, carePlanRef);
-  });
-
-  const exerciseEntries = exercises.map((ex) => {
-    const exerciseFullUrl = `urn:uuid:ex-${uuid()}`;
-    return toFhirExercise(ex, patientRef, exerciseFullUrl, carePlanRef);
-  });
+  const exerciseEntries = exercises.map((ex) =>
+    toFhirExercise(ex, patientRef, `urn:uuid:ex-${uuid()}`, carePlanRef)
+  );
 
   const carePlanResource = {
     resourceType: "CarePlan",
     status: "draft",
     intent: "plan",
     subject: patientRef,
-    period: { start: String(lastUpdated) },
-    meta: { lastUpdated: String(lastUpdated) },
     goal: goalEntries.map((e) => ({ reference: e.fullUrl })),
-    activity: exerciseEntries.map((e) => ({ reference: { reference: e.fullUrl } })),
+    activity: exerciseEntries.map((e) => ({
+      reference: { reference: e.fullUrl },
+    })),
   };
 
   const entries = [];
   if (patientEntry) entries.push(patientEntry);
+  entries.push({ fullUrl: carePlanFullUrl, resource: carePlanResource });
   entries.push(...goalEntries);
   entries.push(...exerciseEntries);
-  entries.push({ fullUrl: carePlanFullUrl, resource: carePlanResource });
 
   return {
     resourceType: "Bundle",
     type: "collection",
     entry: entries,
   };
+}
+
+export function downloadJson(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/fhir+json",
+  });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
 }
