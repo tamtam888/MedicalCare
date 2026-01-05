@@ -152,8 +152,10 @@ export function toFhirCarePlanBundle({ patient, carePlanDraft, includePatient = 
     subject: patientRef,
     period: { start: String(lastUpdated) },
     meta: { lastUpdated: String(lastUpdated) },
-    goal: goalEntries.map((e) => ({ reference: e.fullUrl })),
-    activity: exerciseEntries.map((e) => ({ reference: { reference: e.fullUrl } })),
+    goal: goalEntries.length ? goalEntries.map((e) => ({ reference: e.fullUrl })) : undefined,
+    activity: exerciseEntries.length
+      ? exerciseEntries.map((e) => ({ reference: { reference: e.fullUrl } }))
+      : undefined,
   };
 
   const entries = [];
