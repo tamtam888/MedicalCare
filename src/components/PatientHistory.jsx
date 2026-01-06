@@ -168,7 +168,13 @@ function AudioFromId({ audioId }) {
   return <audio controls preload="metadata" src={src} />;
 }
 
-export default function PatientHistory({ patient, history, onChangeHistory }) {
+export default function PatientHistory({
+  patient,
+  history,
+  onChangeHistory,
+  selectedIds,
+  onToggleSelected,
+}) {
   const [filterType, setFilterType] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -194,8 +200,7 @@ export default function PatientHistory({ patient, history, onChangeHistory }) {
 
     if (filterType !== "all") {
       entries = entries.filter(
-        (entry) =>
-          normalizeType(entry?.type) === normalizeType(filterType)
+        (entry) => normalizeType(entry?.type) === normalizeType(filterType)
       );
     }
 
@@ -254,11 +259,7 @@ export default function PatientHistory({ patient, history, onChangeHistory }) {
     };
     delete updatedEntry.dateInput;
 
-    emitChange(
-      allEntries.map((e) =>
-        e?.id === editingId ? updatedEntry : e
-      )
-    );
+    emitChange(allEntries.map((e) => (e?.id === editingId ? updatedEntry : e)));
 
     setEditingId(null);
     setDraft(null);
@@ -267,6 +268,32 @@ export default function PatientHistory({ patient, history, onChangeHistory }) {
   const handleDraftChange = (key, value) => {
     setDraft((prev) => ({ ...(prev || {}), [key]: value }));
   };
+
+  const isSelected = (entryId) => {
+    if (!selectedIds || typeof selectedIds.has !== "function") return false;
+    return selectedIds.has(String(entryId || ""));
+  };
+
+  const toggleSelected = (entryId) => {
+    if (typeof onToggleSelected === "function") onToggleSelected(entryId);
+  };
+
+  const circleCheckboxStyle = (checked) => ({
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    border: "1.5px solid rgba(145, 130, 255, 0.6)",
+    background: checked ? "#111" : "transparent",
+    boxShadow: checked ? "inset 0 0 0 5px rgba(255,255,255,0.92)" : "none",
+    display: "inline-block",
+    verticalAlign: "middle",
+    cursor: "pointer",
+    appearance: "none",
+    WebkitAppearance: "none",
+    outline: "none",
+    marginInlineEnd: 10,
+    flexShrink: 0,
+  });
 
   return (
     <div className="patient-history-card">
@@ -327,6 +354,8 @@ export default function PatientHistory({ patient, history, onChangeHistory }) {
               ? ""
               : audioUrl || audioData || "";
 
+          const checked = isSelected(entry?.id);
+
           return (
             <li
               key={entry?.id}
@@ -338,14 +367,19 @@ export default function PatientHistory({ patient, history, onChangeHistory }) {
             >
               <div className="history-item-top">
                 <div className="history-meta-row">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleSelected(entry?.id)}
+                    aria-label="Select visit"
+                    style={circleCheckboxStyle(checked)}
+                  />
+
                   <span className={getTypeClass(entry?.type)}>
                     {formatType(entry?.type)}
                   </span>
                   <span className="history-meta-separator">•</span>
-                  <span
-                    className="history-meta-date"
-                    dir="ltr"
-                  >
+                  <span className="history-meta-date" dir="ltr">
                     {formatDateDMY(entry?.date)}
                   </span>
                 </div>
