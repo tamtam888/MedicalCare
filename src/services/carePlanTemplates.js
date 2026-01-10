@@ -1,12 +1,17 @@
 // src/services/carePlanTemplates.js
-
 const TEMPLATE_EXT_URL = "https://medicalcare.app/careplan-template-json";
 
-/**
- * We treat templates as "global" data.
- * If Medplum is not authenticated (no access token / profile),
- * we fall back to local seed templates without breaking the UI.
- */
+const SEED_TAG_SYSTEM = "https://medicalcare.app/tags";
+const SEED_TAG_CODE = "seed-template";
+
+const SEED_IDENTIFIER_SYSTEM = "https://medicalcare.app/identifiers";
+const SEED_IDENTIFIER_PREFIX = "careplan-template-seed";
+
+const CUSTOM_TAG_SYSTEM = "https://medicalcare.app/tags";
+const CUSTOM_TAG_CODE = "custom-template";
+
+const CUSTOM_IDENTIFIER_SYSTEM = "https://medicalcare.app/identifiers";
+const CUSTOM_IDENTIFIER_PREFIX = "careplan-template-custom";
 
 function safeJsonParse(s) {
   try {
@@ -37,22 +42,27 @@ function extractTemplateJson(planDef) {
   return safeJsonParse(value);
 }
 
-function seedToUiTemplates(seedTemplates) {
-  const seed = Array.isArray(seedTemplates) ? seedTemplates : [];
-  return seed
-    .filter((t) => t && typeof t === "object")
-    .map((t, idx) => ({
-      id: `local_${idx}_${toTitle(t)}`.replace(/\s+/g, "_"),
-      title: toTitle(t),
-      count: toExerciseCount(t),
-      raw: t,
-      source: "local",
-    }));
+function slugifyAlnum(s) {
+  return String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 32);
+}
+
+function stableSeedKey(templateObj, index) {
+  const title = toTitle(templateObj);
+  const slug = slugifyAlnum(title) || "template";
+  return `${SEED_IDENTIFIER_PREFIX}:${String(index)}:${slug}`;
+}
+
+function stableCustomKey(localId) {
+  const clean = String(localId || "").trim() || "unknown";
+  return `${CUSTOM_IDENTIFIER_PREFIX}:${clean}`;
 }
 
 function isProbablyAuthError(err) {
   const msg = String(err?.message || "").toLowerCase();
-  // Medplum errors often come as 401/403 or "unauthorized"
   return (
     msg.includes("401") ||
     msg.includes("403") ||
@@ -66,22 +76,16 @@ function isProbablyAuthError(err) {
 async function isMedplumLoggedIn(medplum) {
   if (!medplum) return false;
 
-  // Best effort checks that won’t crash if method doesn’t exist.
   try {
-    // Common in medplum-client: getAccessToken()
-    const token =
-      typeof medplum.getAccessToken === "function" ? medplum.getAccessToken() : null;
+    const token = typeof medplum.getAccessToken === "function" ? medplum.getAccessToken() : null;
     if (token && String(token).trim().length > 10) return true;
   } catch {}
 
   try {
-    // If profile exists, you're authenticated.
-    const profile =
-      typeof medplum.getProfile === "function" ? medplum.getProfile() : null;
+    const profile = typeof medplum.getProfile === "function" ? medplum.getProfile() : null;
     if (profile && profile.resourceType) return true;
   } catch {}
 
-  // If none of the above, assume not logged in
   return false;
 }
 
@@ -91,32 +95,6 @@ export async function listCarePlanTemplatesFromMedplum(medplum) {
     _count: 200,
   });
   return Array.isArray(res) ? res : [];
-}
-
-export async function publishSeedTemplatesOnce(medplum, seedTemplates) {
-  const existing = await listCarePlanTemplatesFromMedplum(medplum);
-  if (existing.length > 0) return;
-
-  const seed = Array.isArray(seedTemplates) ? seedTemplates : [];
-  for (const t of seed) {
-    if (!t || typeof t !== "object") continue;
-
-    const title = toTitle(t);
-    const payload = JSON.stringify(t);
-
-    await medplum.createResource({
-      resourceType: "PlanDefinition",
-      status: "active",
-      title,
-      // store JSON in an extension (simple + works)
-      extension: [
-        {
-          url: TEMPLATE_EXT_URL,
-          valueString: payload,
-        },
-      ],
-    });
-  }
 }
 
 export function planDefinitionsToUiTemplates(planDefs) {
@@ -141,33 +119,125 @@ export function planDefinitionsToUiTemplates(planDefs) {
     .filter(Boolean);
 }
 
-/**
- * Main entry used by UI.
- * - If logged in -> load from Medplum (and seed once if empty)
- * - If not logged in / auth error -> fallback to local seed
- */
-export async function loadCarePlanTemplatesEnsured(medplum, seedTemplates) {
-  const localFallback = () => seedToUiTemplates(seedTemplates);
+async function findByIdentifier(medplum, identifierSystem, identifierValue) {
+  try {
+    const bundle = await medplum.search("PlanDefinition", {
+      identifier: `${identifierSystem}|${identifierValue}`,
+      _count: 1,
+    });
+    return bundle?.entry?.[0]?.resource || null;
+  } catch {
+    return null;
+  }
+}
 
-  // If not logged in, don't even try network calls
+export async function syncSeedTemplatesToMedplum(medplum, seedTemplates) {
   const loggedIn = await isMedplumLoggedIn(medplum);
-  if (!loggedIn) return localFallback();
+  if (!loggedIn) return { ok: false, message: "Not logged in to Medplum." };
+
+  const seed = Array.isArray(seedTemplates) ? seedTemplates : [];
+  let created = 0;
+  let skipped = 0;
+
+  for (let i = 0; i < seed.length; i++) {
+    const t = seed[i];
+    if (!t || typeof t !== "object") continue;
+
+    const seedKey = stableSeedKey(t, i);
+    const title = toTitle(t);
+    const payload = JSON.stringify(t);
+
+    const baseResource = {
+      resourceType: "PlanDefinition",
+      status: "active",
+      title,
+      identifier: [{ system: SEED_IDENTIFIER_SYSTEM, value: seedKey }],
+      meta: {
+        tag: [{ system: SEED_TAG_SYSTEM, code: SEED_TAG_CODE, display: "Seed Template" }],
+      },
+      extension: [{ url: TEMPLATE_EXT_URL, valueString: payload }],
+    };
+
+    const existing = await findByIdentifier(medplum, SEED_IDENTIFIER_SYSTEM, seedKey);
+
+    try {
+      if (existing?.id) {
+        skipped++;
+        continue;
+      }
+      await medplum.createResource(baseResource);
+      created++;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("Seed template sync failed", { seedKey, title, error: e });
+      throw e;
+    }
+  }
+
+  return { ok: true, created, skipped, upserted: created };
+}
+
+export async function syncCustomTemplateToMedplum(medplum, localTemplate) {
+  const loggedIn = await isMedplumLoggedIn(medplum);
+  if (!loggedIn) return { ok: false, message: "Not logged in to Medplum." };
+
+  const tpl = localTemplate && typeof localTemplate === "object" ? localTemplate : null;
+  const localId = String(tpl?.id || "").trim();
+  if (!localId) return { ok: false, message: "Template id is required." };
+
+  const raw = tpl?.raw && typeof tpl.raw === "object" ? tpl.raw : null;
+  if (!raw) return { ok: false, message: "Template raw is required." };
+
+  const identifierValue = stableCustomKey(localId);
+  const existing = await findByIdentifier(medplum, CUSTOM_IDENTIFIER_SYSTEM, identifierValue);
+
+  if (existing?.id) {
+    return { ok: true, mode: "skipped", message: "Template already synced." };
+  }
+
+  const title = String(tpl?.title || toTitle(raw)).trim() || "Template";
+  const payload = JSON.stringify(raw);
+
+  const resource = {
+    resourceType: "PlanDefinition",
+    status: "active",
+    title,
+    identifier: [{ system: CUSTOM_IDENTIFIER_SYSTEM, value: identifierValue }],
+    meta: {
+      tag: [{ system: CUSTOM_TAG_SYSTEM, code: CUSTOM_TAG_CODE, display: "Custom Template" }],
+    },
+    extension: [{ url: TEMPLATE_EXT_URL, valueString: payload }],
+  };
+
+  try {
+    const created = await medplum.createResource(resource);
+    return { ok: true, mode: "created", medplumId: String(created?.id || ""), message: "Template synced." };
+  } catch (e) {
+    if (isProbablyAuthError(e)) return { ok: false, message: "Not authorized." };
+    return { ok: false, message: String(e?.message || "Sync failed.") };
+  }
+}
+
+export async function loadCarePlanTemplatesEnsured(medplum, seedTemplates) {
+  const seedFallback = () => {
+    const seed = Array.isArray(seedTemplates) ? seedTemplates : [];
+    return seed.map((t, i) => ({
+      id: stableSeedKey(t, i),
+      title: toTitle(t),
+      count: toExerciseCount(t),
+      raw: t,
+      source: "seed",
+    }));
+  };
+
+  const loggedIn = await isMedplumLoggedIn(medplum);
+  if (!loggedIn) return seedFallback();
 
   try {
     const existing = await listCarePlanTemplatesFromMedplum(medplum);
-    if (existing.length === 0) {
-      await publishSeedTemplatesOnce(medplum, seedTemplates);
-    }
-    const after = await listCarePlanTemplatesFromMedplum(medplum);
-    return planDefinitionsToUiTemplates(after);
+    return planDefinitionsToUiTemplates(existing);
   } catch (e) {
-    // If it's auth-related, fallback silently to local so the UI works.
-    if (isProbablyAuthError(e)) {
-      return localFallback();
-    }
-    // For other errors, still fallback (so the user isn't blocked),
-    // but keep the error meaningful by rethrowing if you want.
-    // Here we fallback to be resilient.
-    return localFallback();
+    if (isProbablyAuthError(e)) return seedFallback();
+    return seedFallback();
   }
 }
