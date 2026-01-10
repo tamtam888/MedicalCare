@@ -1,32 +1,25 @@
+// src/pages/CarePlansPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CarePlansPage.css";
-import { formatDateTimeDMY } from "../utils/dateFormat";
+import { medplum } from "../medplumClient";
+import {
+  loadCarePlanTemplatesEnsured,
+  syncSeedTemplatesToMedplum,
+} from "../services/carePlanTemplates";
+import { listExercises, seedLocalExercisesOnce, upsertLocalExercise, archiveLocalExercise } from "../services/exerciseLibrary";
 
-const TEMPLATE_FILES = [
-  "/exercise-library/knee_rehabilitation.json",
-  "/exercise-library/low_back_pain.json",
-  "/exercise-library/shoulder_mobility.json",
-  "/exercise-library/post_op_general_activity.json",
-  "/exercise-library/balance_training.json",
-];
+import kneeRehabilitation from "../seed/exercise-library/knee_rehabilitation.json";
+import lowBackPain from "../seed/exercise-library/low_back_pain.json";
+import shoulderMobility from "../seed/exercise-library/shoulder_mobility.json";
+import postOpGeneralActivity from "../seed/exercise-library/post_op_general_activity.json";
+import balanceTraining from "../seed/exercise-library/balance_training.json";
 
-function toPatientId(p) {
-  return String(p?.idNumber || p?.id || "").trim();
-}
+const SEED_TEMPLATES = [kneeRehabilitation, lowBackPain, shoulderMobility, postOpGeneralActivity, balanceTraining];
 
-function fullName(p) {
-  const first = String(p?.firstName || "").trim();
-  const last = String(p?.lastName || "").trim();
-  const name = `${first} ${last}`.trim();
-  return name || "Unknown patient";
-}
-
-function getGenderNameClass(g) {
-  const s = String(g || "").toLowerCase().trim();
-  if (s === "female") return "patient-name-female";
-  if (s === "male") return "patient-name-male";
-  return "patient-name-other";
+function toExerciseCount(obj) {
+  const ex = Array.isArray(obj?.exercises) ? obj.exercises : [];
+  return ex.length;
 }
 
 function createId(prefix) {
@@ -46,190 +39,437 @@ function downloadJson(filename, data) {
   URL.revokeObjectURL(url);
 }
 
-function mapTemplateToCarePlanDraft(templateJson) {
-  const now = new Date().toISOString();
-  const title = String(templateJson?.category || templateJson?.title || "Care plan").trim() || "Care plan";
-  const exercisesRaw = Array.isArray(templateJson?.exercises) ? templateJson.exercises : [];
-
-  const exercises = exercisesRaw
-    .filter(Boolean)
-    .map((x) => {
-      const name = String(x?.name || "").trim();
-      const instructions = String(x?.instructions || "");
-      const frequency = String(x?.defaultFrequency || x?.frequency || "").trim();
-      const sets = typeof x?.defaultSets === "number" ? x.defaultSets : typeof x?.sets === "number" ? x.sets : undefined;
-      const reps = typeof x?.defaultReps === "number" ? x.defaultReps : typeof x?.reps === "number" ? x.reps : undefined;
-      const durationMin =
-        typeof x?.defaultDurationMin === "number"
-          ? x.defaultDurationMin
-          : typeof x?.durationMin === "number"
-          ? x.durationMin
-          : undefined;
-
-      return {
-        id: x?.id ? String(x.id) : createId("ex"),
-        name,
-        instructions,
-        frequency,
-        sets,
-        reps,
-        durationMin,
-      };
-    })
-    .filter((x) => x.name && x.frequency);
-
+function normalizeTemplateExercise(x) {
+  const obj = x && typeof x === "object" ? x : {};
   return {
-    id: createId("cp"),
-    title,
-    updatedAt: now,
-    goals: [],
-    exercises,
+    name: String(obj.name || "").trim(),
+    instructions: String(obj.instructions || "").trim(),
+    tags: Array.isArray(obj.tags) ? obj.tags.map((t) => String(t || "").trim()).filter(Boolean) : [],
+    mediaUrl: obj.mediaUrl ? String(obj.mediaUrl).trim() : "",
   };
 }
 
-function getAllActiveCarePlans(patients) {
-  const rows = [];
-
-  (patients || []).forEach((p) => {
-    const patientId = toPatientId(p);
-    if (!patientId) return;
-
-    const patientName = fullName(p);
-    const gender = p?.gender;
-
-    const draft = p?.carePlanDraft;
-    if (draft && typeof draft === "object") {
-      rows.push({
-        patientId,
-        patientName,
-        patientGender: gender,
-        carePlanId: String(draft.id || ""),
-        title: String(draft.title || "Care plan"),
-        updatedAt: draft.updatedAt || "",
-        goalsCount: Array.isArray(draft.goals) ? draft.goals.length : 0,
-        exerciseCount: Array.isArray(draft.exercises) ? draft.exercises.length : 0,
-        raw: draft,
+function extractSeedExercises(seedTemplates) {
+  const out = [];
+  const list = Array.isArray(seedTemplates) ? seedTemplates : [];
+  for (const tpl of list) {
+    const exercises = Array.isArray(tpl?.exercises) ? tpl.exercises : [];
+    for (const ex of exercises) {
+      const n = normalizeTemplateExercise(ex);
+      if (!n.name) continue;
+      out.push({
+        name: n.name,
+        instructions: n.instructions,
+        tags: n.tags,
+        mediaUrl: n.mediaUrl,
+        scope: "global",
+        archived: false,
       });
     }
-
-    const plans = Array.isArray(p?.carePlans) ? p.carePlans : [];
-    plans.forEach((cp) => {
-      if (!cp || typeof cp !== "object") return;
-      rows.push({
-        patientId,
-        patientName,
-        patientGender: gender,
-        carePlanId: String(cp.id || ""),
-        title: String(cp.title || "Care plan"),
-        updatedAt: cp.updatedAt || "",
-        goalsCount: Array.isArray(cp.goals) ? cp.goals.length : 0,
-        exerciseCount: Array.isArray(cp.exercises) ? cp.exercises.length : 0,
-        raw: cp,
-      });
-    });
-  });
-
-  rows.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-  return rows;
+  }
+  return out;
 }
 
-export default function CarePlansPage({ patients = [], onUpdatePatient }) {
+export default function CarePlansPage() {
   const navigate = useNavigate();
+
+  const [activeFolder, setActiveFolder] = useState(null); // "templates" | "exercises" | null
+
+  const [templatesOpen, setTemplatesOpen] = useState(true);
+  const [exercisesOpen, setExercisesOpen] = useState(false);
 
   const [templates, setTemplates] = useState([]);
   const [templatesError, setTemplatesError] = useState("");
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
-  const [query, setQuery] = useState("");
-  const [showTemplates, setShowTemplates] = useState(true);
-  const [showActive, setShowActive] = useState(true);
+  const [seedSyncing, setSeedSyncing] = useState(false);
+  const [seedSyncMsg, setSeedSyncMsg] = useState("");
 
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [selectedPatientId, setSelectedPatientId] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [customTemplates, setCustomTemplates] = useState(() => {
+    return [];
+  });
 
-  const activePlansAll = useMemo(() => getAllActiveCarePlans(patients), [patients]);
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+  const [templateEditorMode, setTemplateEditorMode] = useState("new");
+  const [templateEditorTemplateId, setTemplateEditorTemplateId] = useState("");
+  const [templateEditorTitle, setTemplateEditorTitle] = useState("");
+  const [templateEditorError, setTemplateEditorError] = useState("");
 
-  const activePlans = useMemo(() => {
-    const q = String(query || "").trim().toLowerCase();
-    if (!q) return activePlansAll;
+  const [templatePickerQuery, setTemplatePickerQuery] = useState("");
+  const [templateSelected, setTemplateSelected] = useState([]); // [{ name, instructions, tags, mediaUrl }]
 
-    return activePlansAll.filter((x) => {
-      return (
-        String(x.title || "").toLowerCase().includes(q) ||
-        String(x.patientName || "").toLowerCase().includes(q) ||
-        String(x.patientId || "").toLowerCase().includes(q)
-      );
+  const [templateSyncingId, setTemplateSyncingId] = useState("");
+  const [templateSyncMsg, setTemplateSyncMsg] = useState("");
+
+  const [exercises, setExercises] = useState([]);
+  const [exercisesLoading, setExercisesLoading] = useState(false);
+  const [exercisesError, setExercisesError] = useState("");
+  const [exerciseQuery, setExerciseQuery] = useState("");
+  const [showArchivedExercises, setShowArchivedExercises] = useState(false);
+
+  const [exerciseEditorOpen, setExerciseEditorOpen] = useState(false);
+  const [exerciseEditorMode, setExerciseEditorMode] = useState("new");
+  const [exerciseEditorId, setExerciseEditorId] = useState("");
+  const [exerciseName, setExerciseName] = useState("");
+  const [exerciseInstructions, setExerciseInstructions] = useState("");
+  const [exerciseTags, setExerciseTags] = useState("");
+  const [exerciseScope, setExerciseScope] = useState("global");
+  const [exerciseEditorError, setExerciseEditorError] = useState("");
+
+  const templatesMerged = useMemo(() => {
+    const out = [];
+    const seen = new Set();
+
+    (customTemplates || []).forEach((t) => {
+      if (!t?.id) return;
+      if (seen.has(t.id)) return;
+      seen.add(t.id);
+      out.push(t);
     });
-  }, [activePlansAll, query]);
 
-  const patientOptions = useMemo(() => {
-    return (patients || [])
-      .map((p) => ({ id: toPatientId(p), name: fullName(p) }))
-      .filter((x) => x.id);
-  }, [patients]);
+    (templates || []).forEach((t) => {
+      if (!t?.id) return;
+      if (seen.has(t.id)) return;
+      seen.add(t.id);
+      out.push(t);
+    });
+
+    return out;
+  }, [customTemplates, templates]);
+
+  const filteredExercises = useMemo(() => {
+    const q = String(exerciseQuery || "").trim().toLowerCase();
+    const base = Array.isArray(exercises) ? exercises : [];
+    const visible = showArchivedExercises ? base : base.filter((x) => !x.archived);
+
+    if (!q) return visible;
+    return visible.filter((x) => {
+      const name = String(x.name || "").toLowerCase();
+      const tags = Array.isArray(x.tags) ? x.tags.join(", ").toLowerCase() : "";
+      return name.includes(q) || tags.includes(q);
+    });
+  }, [exercises, exerciseQuery, showArchivedExercises]);
+
+  const exerciseGroups = useMemo(() => {
+    const map = new Map();
+    for (const ex of filteredExercises) {
+      const firstTag = Array.isArray(ex.tags) && ex.tags.length > 0 ? String(ex.tags[0]) : "General";
+      const key = firstTag || "General";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(ex);
+    }
+    const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
+    return keys.map((k) => ({ key: k, items: map.get(k) }));
+  }, [filteredExercises]);
+
+  const pickerResults = useMemo(() => {
+    const q = String(templatePickerQuery || "").trim().toLowerCase();
+    const base = (exercises || []).filter((x) => !x.archived);
+    if (!q) return base.slice(0, 40);
+
+    return base
+      .filter((x) => {
+        const name = String(x.name || "").toLowerCase();
+        const tags = Array.isArray(x.tags) ? x.tags.join(", ").toLowerCase() : "";
+        return name.includes(q) || tags.includes(q);
+      })
+      .slice(0, 40);
+  }, [templatePickerQuery, exercises]);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadAll() {
+    async function loadAllTemplates() {
       try {
-        const results = await Promise.all(
-          TEMPLATE_FILES.map(async (path) => {
-            const res = await fetch(path, { cache: "no-store" });
-            if (!res.ok) throw new Error("Template load failed");
-            const json = await res.json();
-            return {
-              path,
-              title: String(json?.category || json?.title || "Template"),
-              count: Array.isArray(json?.exercises) ? json.exercises.length : 0,
-              raw: json,
-            };
-          })
-        );
-
+        setTemplatesLoading(true);
+        const results = await loadCarePlanTemplatesEnsured(medplum, SEED_TEMPLATES);
         if (!cancelled) {
           setTemplates(results);
           setTemplatesError("");
         }
-      } catch {
-        if (!cancelled) setTemplatesError("Failed to load templates.");
+      } catch (e) {
+        if (!cancelled) {
+          setTemplates([]);
+          const msg = e?.message && typeof e.message === "string" ? e.message : "Failed to load templates.";
+          setTemplatesError(msg);
+        }
+      } finally {
+        if (!cancelled) setTemplatesLoading(false);
       }
     }
 
-    loadAll();
+    loadAllTemplates();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  function openAssign(template) {
-    setSelectedTemplate(template);
-    setSelectedPatientId(patientOptions[0]?.id || "");
-    setAssignOpen(true);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAllExercises() {
+      try {
+        setExercisesLoading(true);
+
+        const seedItems = extractSeedExercises(SEED_TEMPLATES);
+        seedLocalExercisesOnce(seedItems);
+
+        const rows = await listExercises(medplum, { wantSync: true, includeArchived: true });
+        if (!cancelled) {
+          setExercises(rows);
+          setExercisesError("");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setExercises([]);
+          const msg = e?.message && typeof e.message === "string" ? e.message : "Failed to load exercises.";
+          setExercisesError(msg);
+        }
+      } finally {
+        if (!cancelled) setExercisesLoading(false);
+      }
+    }
+
+    loadAllExercises();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function openNewTemplate() {
+    setTemplateEditorMode("new");
+    setTemplateEditorTemplateId("");
+    setTemplateEditorTitle("New template");
+    setTemplateSelected([]);
+    setTemplatePickerQuery("");
+    setTemplateEditorError("");
+    setTemplateSyncMsg("");
+    setTemplateEditorOpen(true);
   }
 
-  function closeAssign() {
-    setAssignOpen(false);
-    setSelectedTemplate(null);
+  function closeTemplateEditor() {
+    setTemplateEditorOpen(false);
+    setTemplateEditorError("");
   }
 
-  function assignTemplate() {
-    if (!selectedTemplate || !selectedPatientId) return;
-    if (typeof onUpdatePatient !== "function") return;
+  function addExerciseToTemplate(ex) {
+    const n = normalizeTemplateExercise({
+      name: ex?.name,
+      instructions: ex?.instructions,
+      tags: ex?.tags,
+      mediaUrl: ex?.mediaUrl,
+    });
+    if (!n.name) return;
 
-    const patient = (patients || []).find((p) => toPatientId(p) === selectedPatientId);
-    if (!patient) return;
+    const exists = templateSelected.some((t) => String(t.name).toLowerCase() === n.name.toLowerCase());
+    if (exists) return;
 
-    const draft = mapTemplateToCarePlanDraft(selectedTemplate.raw);
-    onUpdatePatient({ ...patient, carePlanDraft: draft });
-
-    setAssignOpen(false);
-    navigate(`/patients/${selectedPatientId}`);
+    setTemplateSelected((prev) => [...prev, n]);
   }
 
-  function exportActive(item) {
-    const filename = `${item.patientId}_careplan.json`;
-    downloadJson(filename, item.raw);
+  function removeExerciseFromTemplate(name) {
+    const key = String(name || "").trim().toLowerCase();
+    setTemplateSelected((prev) => prev.filter((x) => String(x.name || "").trim().toLowerCase() !== key));
+  }
+
+  function saveTemplateEditor() {
+    const title = String(templateEditorTitle || "").trim();
+    if (!title) {
+      setTemplateEditorError("Title is required.");
+      return;
+    }
+
+    const exercisesRaw = (templateSelected || [])
+      .map((x) => normalizeTemplateExercise(x))
+      .filter((x) => x.name);
+
+    if (exercisesRaw.length === 0) {
+      setTemplateEditorError("Please add at least one exercise.");
+      return;
+    }
+
+    const raw = {
+      category: title,
+      exercises: exercisesRaw,
+    };
+
+    const now = new Date().toISOString();
+    const id = templateEditorMode === "edit" && templateEditorTemplateId ? templateEditorTemplateId : createId("tpl");
+
+    const nextRow = {
+      id,
+      title,
+      raw,
+      count: toExerciseCount(raw),
+      source: "local-custom",
+      updatedAt: now,
+    };
+
+    const next = [nextRow, ...(customTemplates || []).filter((t) => String(t.id) !== String(id))];
+    setCustomTemplates(next);
+    setTemplateEditorOpen(false);
+  }
+
+  function openEditTemplate(t) {
+    if (t?.source !== "local-custom") {
+      alert("This template is not editable here. Duplicate it first.");
+      return;
+    }
+
+    const raw = t?.raw && typeof t.raw === "object" ? t.raw : {};
+    const exercisesRaw = Array.isArray(raw?.exercises) ? raw.exercises : [];
+
+    setTemplateEditorMode("edit");
+    setTemplateEditorTemplateId(String(t.id));
+    setTemplateEditorTitle(String(t.title || "Template"));
+    setTemplateSelected(exercisesRaw.map(normalizeTemplateExercise).filter((x) => x.name));
+    setTemplatePickerQuery("");
+    setTemplateEditorError("");
+    setTemplateSyncMsg("");
+    setTemplateEditorOpen(true);
+  }
+
+  function duplicateTemplate(t) {
+    const baseRaw = t?.raw && typeof t.raw === "object" ? t.raw : {};
+    const now = new Date().toISOString();
+    const id = createId("tpl");
+    const title = `${String(t?.title || "Template")} (copy)`;
+
+    const next = [
+      { id, title, raw: baseRaw, count: toExerciseCount(baseRaw), source: "local-custom", updatedAt: now },
+      ...(customTemplates || []),
+    ];
+    setCustomTemplates(next);
+  }
+
+  function deleteTemplate(t) {
+    if (t?.source !== "local-custom") {
+      alert("Seed/Medplum templates can't be deleted here.");
+      return;
+    }
+    const ok = confirm(`Delete "${t.title}"?`);
+    if (!ok) return;
+
+    const next = (customTemplates || []).filter((x) => String(x.id) !== String(t.id));
+    setCustomTemplates(next);
+  }
+
+  function downloadTemplate(t) {
+    const safeTitle = String(t?.title || "template")
+      .trim()
+      .replace(/[^\w\- ]+/g, "")
+      .replace(/\s+/g, "_");
+    const filename = `${safeTitle || "template"}.json`;
+    downloadJson(filename, t?.raw || {});
+  }
+
+  async function syncSeedNow() {
+    setSeedSyncing(true);
+    setSeedSyncMsg("");
+    try {
+      const res = await syncSeedTemplatesToMedplum(medplum, SEED_TEMPLATES);
+      const msg = res?.ok
+        ? `Seed sync complete. Created: ${res.created || 0}. Skipped: ${res.skipped || 0}.`
+        : res?.message || "Seed sync failed.";
+      setSeedSyncMsg(msg);
+
+      const after = await loadCarePlanTemplatesEnsured(medplum, SEED_TEMPLATES);
+      setTemplates(after);
+    } catch (e) {
+      setSeedSyncMsg(String(e?.message || "Seed sync failed."));
+    } finally {
+      setSeedSyncing(false);
+    }
+  }
+
+  async function syncCustomTemplate(t) {
+    if (t?.source !== "local-custom") return;
+
+    setTemplateSyncingId(String(t.id));
+    setTemplateSyncMsg("");
+    try {
+      const res = await syncCustomTemplateToMedplum(medplum, t);
+      setTemplateSyncMsg(res?.message || "Sync done.");
+      const after = await loadCarePlanTemplatesEnsured(medplum, SEED_TEMPLATES);
+      setTemplates(after);
+    } catch (e) {
+      setTemplateSyncMsg(String(e?.message || "Sync failed."));
+    } finally {
+      setTemplateSyncingId("");
+    }
+  }
+
+  function openNewExercise() {
+    setExerciseEditorMode("new");
+    setExerciseEditorId("");
+    setExerciseName("");
+    setExerciseInstructions("");
+    setExerciseTags("");
+    setExerciseScope("global");
+    setExerciseEditorError("");
+    setExerciseEditorOpen(true);
+  }
+
+  function openEditExercise(ex) {
+    setExerciseEditorMode("edit");
+    setExerciseEditorId(String(ex.id));
+    setExerciseName(String(ex.name || ""));
+    setExerciseInstructions(String(ex.instructions || ""));
+    setExerciseTags(Array.isArray(ex.tags) ? ex.tags.join(", ") : "");
+    setExerciseScope(ex.scope === "user" ? "user" : "global");
+    setExerciseEditorError("");
+    setExerciseEditorOpen(true);
+  }
+
+  function closeExerciseEditor() {
+    setExerciseEditorOpen(false);
+    setExerciseEditorError("");
+  }
+
+  async function saveExerciseEditor() {
+    const name = String(exerciseName || "").trim();
+    if (!name) {
+      setExerciseEditorError("Exercise name is required.");
+      return;
+    }
+
+    const tags = String(exerciseTags || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    try {
+      upsertLocalExercise({
+        id: exerciseEditorMode === "edit" ? exerciseEditorId : undefined,
+        name,
+        instructions: String(exerciseInstructions || ""),
+        tags,
+        scope: exerciseScope === "user" ? "user" : "global",
+        archived: false,
+      });
+
+      const rows = await listExercises(medplum, { wantSync: true, includeArchived: true });
+      setExercises(rows);
+
+      setExerciseEditorOpen(false);
+    } catch (e) {
+      setExerciseEditorError(String(e?.message || "Failed to save exercise."));
+    }
+  }
+
+  async function archiveExercise(ex) {
+    const ok = confirm(`Archive "${ex.name}"?`);
+    if (!ok) return;
+
+    archiveLocalExercise(ex.id, true);
+    const rows = await listExercises(medplum, { wantSync: true, includeArchived: true });
+    setExercises(rows);
+  }
+
+  async function restoreExercise(ex) {
+    archiveLocalExercise(ex.id, false);
+    const rows = await listExercises(medplum, { wantSync: true, includeArchived: true });
+    setExercises(rows);
   }
 
   return (
@@ -238,7 +478,7 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
         <div className="careplans-header">
           <div>
             <h2 className="section-title">Care plans</h2>
-            <div className="careplans-subtitle">Templates and active patient care plans.</div>
+            <div className="careplans-subtitle">Templates & exercise library. Patients are managed in Patients pages.</div>
           </div>
 
           <div className="careplans-header-actions">
@@ -248,159 +488,367 @@ export default function CarePlansPage({ patients = [], onUpdatePatient }) {
           </div>
         </div>
 
-        <div className="careplans-toolbar">
-          <input
-            className="inline-input careplans-search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by patient, ID, or plan title..."
-          />
+        <div className="careplans-folder-cards">
+          <button
+            type="button"
+            className={"careplans-folder-card" + (activeFolder === "templates" ? " is-active" : "")}
+            onClick={() => {
+              setActiveFolder("templates");
+              setTemplatesOpen(true);
+              setExercisesOpen(false);
+            }}
+          >
+            <div className="careplans-folder-card-title">Templates</div>
+            <div className="careplans-folder-card-meta">{templatesMerged.length}</div>
+          </button>
 
-          <div className="careplans-toggles">
-            <button
-              type="button"
-              className={"header-chip-btn" + (showTemplates ? " careplans-chip-active" : "")}
-              onClick={() => setShowTemplates((v) => !v)}
-            >
-              Templates
-            </button>
-            <button
-              type="button"
-              className={"header-chip-btn" + (showActive ? " careplans-chip-active" : "")}
-              onClick={() => setShowActive((v) => !v)}
-            >
-              Active
-            </button>
-          </div>
+          <button
+            type="button"
+            className={"careplans-folder-card" + (activeFolder === "exercises" ? " is-active" : "")}
+            onClick={() => {
+              setActiveFolder("exercises");
+              setTemplatesOpen(false);
+              setExercisesOpen(true);
+            }}
+          >
+            <div className="careplans-folder-card-title">Exercise Library</div>
+            <div className="careplans-folder-card-meta">{filteredExercises.length}</div>
+          </button>
         </div>
       </section>
 
-      {showTemplates ? (
-        <section className="patient-card careplans-card-outline">
-          <div className="careplans-section-head">
-            <h2 className="section-title">Templates</h2>
-            <div className="careplans-count">{templates.length}</div>
-          </div>
+      <section className="patient-card careplans-card-outline">
+        <button
+          type="button"
+          className={"careplans-folder-head" + (templatesOpen ? " is-open" : "")}
+          onClick={() => setTemplatesOpen((v) => !v)}
+        >
+          <span className="careplans-folder-title">Templates Library</span>
+          <span className="careplans-folder-meta">{templatesMerged.length}</span>
+          <span className="careplans-folder-caret" aria-hidden="true">
+            ▾
+          </span>
+        </button>
 
-          {templatesError ? (
-            <div className="careplans-empty">{templatesError}</div>
-          ) : templates.length === 0 ? (
-            <div className="careplans-empty">No templates found.</div>
-          ) : (
-            <div className="careplans-templates-grid">
-              {templates.map((t) => (
-                <div className="careplans-template-tile" key={t.path}>
-                  <div className="careplans-tile-top">
-                    <div className="careplans-tile-title">{t.title}</div>
-                    <div className="careplans-mini-meta">Exercises: {t.count}</div>
-                  </div>
+        {templatesOpen ? (
+          <div className="careplans-folder-body">
+            <div className="careplans-folder-actions">
+              <button type="button" className="header-chip-btn" onClick={openNewTemplate}>
+                New template
+              </button>
 
-                  <div className="careplans-tile-actions">
-                    <a className="header-chip-btn careplans-link" href={t.path} download>
-                      Download
-                    </a>
-                    <button type="button" className="header-chip-btn" onClick={() => openAssign(t)}>
-                      Assign
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <button type="button" className="header-chip-btn" onClick={syncSeedNow} disabled={seedSyncing}>
+                {seedSyncing ? "Syncing..." : "Sync seed to Medplum"}
+              </button>
             </div>
-          )}
-        </section>
-      ) : null}
 
-      {showActive ? (
-        <section className="patient-card careplans-card-outline">
-          <div className="careplans-section-head">
-            <h2 className="section-title">Active care plans</h2>
-            <div className="careplans-count">{activePlans.length}</div>
-          </div>
+            {seedSyncMsg ? <div className="careplans-empty">{seedSyncMsg}</div> : null}
+            {templateSyncMsg ? <div className="careplans-empty">{templateSyncMsg}</div> : null}
 
-          {activePlans.length === 0 ? (
-            <div className="careplans-empty">No active care plans yet.</div>
-          ) : (
-            <div className="careplans-active-list">
-              {activePlans.map((it) => (
-                <div className="careplans-active-row" key={`${it.patientId}_${it.carePlanId}`}>
-                  <div className="careplans-active-main">
-                    <div className="careplans-active-title">Care plan</div>
-
-                    <div className="careplans-active-line">
-                      <span className={"careplans-patient-name " + getGenderNameClass(it.patientGender)}>
-                        {it.patientName}
-                      </span>
-                      <span className="careplans-patient-id">ID: {it.patientId}</span>
+            {templatesLoading ? (
+              <div className="careplans-empty">Loading templates...</div>
+            ) : templatesError ? (
+              <div className="careplans-empty">{templatesError}</div>
+            ) : templatesMerged.length === 0 ? (
+              <div className="careplans-empty">No templates found.</div>
+            ) : (
+              <div className="careplans-templates-grid">
+                {templatesMerged.map((t) => (
+                  <div className="careplans-template-tile" key={t.id}>
+                    <div className="careplans-tile-top">
+                      <div className="careplans-tile-title">{t.title}</div>
+                      <div className="careplans-mini-meta">Exercises: {t.count}</div>
+                      <div className="careplans-mini-meta">Source: {t.source}</div>
                     </div>
 
-                    <div className="careplans-active-meta">
-                      <span className="careplans-meta-item">Exercises: {it.exerciseCount}</span>
-                      <span className="careplans-meta-item">Goals: {it.goalsCount}</span>
-                      <span className="careplans-meta-item">
-                        Updated: <bdi dir="ltr">{it.updatedAt ? formatDateTimeDMY(it.updatedAt) : "—"}</bdi>
-                      </span>
+                    <div className="careplans-tile-actions">
+                      <button type="button" className="header-chip-btn careplans-link" onClick={() => downloadTemplate(t)}>
+                        Download
+                      </button>
+
+                      <button type="button" className="header-chip-btn" onClick={() => duplicateTemplate(t)}>
+                        Duplicate
+                      </button>
+
+                      <button type="button" className="header-chip-btn" onClick={() => openEditTemplate(t)}>
+                        Edit
+                      </button>
+
+                      <button type="button" className="header-chip-btn" onClick={() => deleteTemplate(t)}>
+                        Delete
+                      </button>
+
+                      {t.source === "local-custom" ? (
+                        <button
+                          type="button"
+                          className="header-chip-btn"
+                          onClick={() => syncCustomTemplate(t)}
+                          disabled={templateSyncingId === String(t.id)}
+                        >
+                          {templateSyncingId === String(t.id) ? "Syncing..." : "Sync to Medplum"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </section>
 
-                  <div className="careplans-actions">
-                    <button type="button" className="header-chip-btn" onClick={() => exportActive(it)}>
-                      Export
-                    </button>
-                    <button type="button" className="header-chip-btn" onClick={() => navigate(`/patients/${it.patientId}`)}>
-                      Open
-                    </button>
-                  </div>
-                </div>
-              ))}
+      <section className="patient-card careplans-card-outline">
+        <button
+          type="button"
+          className={"careplans-folder-head" + (exercisesOpen ? " is-open" : "")}
+          onClick={() => setExercisesOpen((v) => !v)}
+        >
+          <span className="careplans-folder-title">Exercise Library</span>
+          <span className="careplans-folder-meta">{filteredExercises.length}</span>
+          <span className="careplans-folder-caret" aria-hidden="true">
+            ▾
+          </span>
+        </button>
+
+        {exercisesOpen ? (
+          <div className="careplans-folder-body">
+            <div className="careplans-ex-toolbar">
+              <input
+                className="inline-input careplans-ex-search"
+                value={exerciseQuery}
+                onChange={(e) => setExerciseQuery(e.target.value)}
+                placeholder="Search exercises by name or tag..."
+              />
+
+              <div className="careplans-ex-actions">
+                <button
+                  type="button"
+                  className={"header-chip-btn" + (showArchivedExercises ? " careplans-chip-active" : "")}
+                  onClick={() => setShowArchivedExercises((v) => !v)}
+                >
+                  Archived
+                </button>
+
+                <button type="button" className="header-chip-btn" onClick={openNewExercise}>
+                  New exercise
+                </button>
+              </div>
             </div>
-          )}
-        </section>
-      ) : null}
 
-      {assignOpen ? (
+            {exercisesLoading ? (
+              <div className="careplans-empty">Loading exercises...</div>
+            ) : exercisesError ? (
+              <div className="careplans-empty">{exercisesError}</div>
+            ) : filteredExercises.length === 0 ? (
+              <div className="careplans-empty">No exercises yet.</div>
+            ) : (
+              <div className="careplans-ex-groups">
+                {exerciseGroups.map((g) => (
+                  <div className="careplans-ex-group" key={g.key}>
+                    <div className="careplans-ex-group-title">{g.key}</div>
+
+                    <div className="careplans-ex-list">
+                      {g.items.map((ex) => (
+                        <div className={"careplans-ex-row" + (ex.archived ? " is-archived" : "")} key={ex.id}>
+                          <div className="careplans-ex-main">
+                            <div className="careplans-ex-name">{ex.name}</div>
+                            <div className="careplans-ex-meta">
+                              <span className="careplans-ex-pill">{ex.scope === "user" ? "My" : "Global"}</span>
+                              {Array.isArray(ex.tags) && ex.tags.length > 0 ? (
+                                <span className="careplans-ex-tags">{ex.tags.join(", ")}</span>
+                              ) : (
+                                <span className="careplans-ex-tags">—</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="careplans-ex-row-actions">
+                            <button type="button" className="header-chip-btn" onClick={() => openEditExercise(ex)}>
+                              Edit
+                            </button>
+
+                            {!ex.archived ? (
+                              <button type="button" className="header-chip-btn" onClick={() => archiveExercise(ex)}>
+                                Archive
+                              </button>
+                            ) : (
+                              <button type="button" className="header-chip-btn" onClick={() => restoreExercise(ex)}>
+                                Restore
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      {templateEditorOpen ? (
         <div
           className="careplans-modal-overlay"
           role="dialog"
           aria-modal="true"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeAssign();
+            if (e.target === e.currentTarget) closeTemplateEditor();
           }}
         >
           <div className="careplans-modal careplans-card-outline">
             <div className="careplans-modal-header">
-              <div className="careplans-modal-title">Assign template</div>
-              <button type="button" className="careplans-modal-close" onClick={closeAssign}>
+              <div className="careplans-modal-title">{templateEditorMode === "edit" ? "Edit template" : "New template"}</div>
+              <button type="button" className="careplans-modal-close" onClick={closeTemplateEditor}>
                 ✕
               </button>
             </div>
 
             <div className="careplans-modal-body">
               <div className="careplans-field">
-                <div className="careplans-label">Template</div>
-                <div className="careplans-value">{selectedTemplate?.title || "—"}</div>
+                <div className="careplans-label">Title</div>
+                <input
+                  className="inline-input"
+                  value={templateEditorTitle}
+                  onChange={(e) => setTemplateEditorTitle(e.target.value)}
+                  placeholder="Template title..."
+                />
               </div>
 
               <div className="careplans-field">
-                <div className="careplans-label">Patient</div>
-                <select
+                <div className="careplans-label">Selected exercises</div>
+
+                {templateSelected.length === 0 ? (
+                  <div className="careplans-empty">No exercises selected yet.</div>
+                ) : (
+                  <div className="careplans-selected-list">
+                    {templateSelected.map((x) => (
+                      <div className="careplans-selected-row" key={x.name}>
+                        <div className="careplans-selected-main">
+                          <div className="careplans-selected-name">{x.name}</div>
+                          <div className="careplans-selected-meta">
+                            {Array.isArray(x.tags) && x.tags.length > 0 ? x.tags.join(", ") : "—"}
+                          </div>
+                        </div>
+                        <button type="button" className="header-chip-btn" onClick={() => removeExerciseFromTemplate(x.name)}>
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="careplans-field">
+                <div className="careplans-label">Add exercises from library</div>
+                <input
                   className="inline-input"
-                  value={selectedPatientId}
-                  onChange={(e) => setSelectedPatientId(e.target.value)}
-                >
-                  {patientOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (ID: {p.id})
-                    </option>
-                  ))}
-                </select>
+                  value={templatePickerQuery}
+                  onChange={(e) => setTemplatePickerQuery(e.target.value)}
+                  placeholder="Search exercises..."
+                />
+
+                <div className="careplans-picker-list">
+                  {pickerResults.map((ex) => {
+                    const already = templateSelected.some(
+                      (t) => String(t.name).toLowerCase() === String(ex.name || "").toLowerCase()
+                    );
+                    return (
+                      <div className="careplans-picker-row" key={ex.id}>
+                        <div className="careplans-picker-main">
+                          <div className="careplans-picker-name">{ex.name}</div>
+                          <div className="careplans-picker-meta">
+                            {Array.isArray(ex.tags) && ex.tags.length > 0 ? ex.tags.join(", ") : "—"}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className={"header-chip-btn" + (already ? " careplans-chip-disabled" : "")}
+                          onClick={() => addExerciseToTemplate(ex)}
+                          disabled={already}
+                        >
+                          {already ? "Added" : "Add"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {templateEditorError ? <div className="careplans-empty">{templateEditorError}</div> : null}
               </div>
 
               <div className="careplans-modal-actions">
-                <button type="button" className="header-chip-btn" onClick={closeAssign}>
+                <button type="button" className="header-chip-btn" onClick={closeTemplateEditor}>
                   Cancel
                 </button>
-                <button type="button" className="header-chip-btn" onClick={assignTemplate}>
-                  Assign
+                <button type="button" className="header-chip-btn" onClick={saveTemplateEditor}>
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {exerciseEditorOpen ? (
+        <div
+          className="careplans-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeExerciseEditor();
+          }}
+        >
+          <div className="careplans-modal careplans-card-outline">
+            <div className="careplans-modal-header">
+              <div className="careplans-modal-title">{exerciseEditorMode === "edit" ? "Edit exercise" : "New exercise"}</div>
+              <button type="button" className="careplans-modal-close" onClick={closeExerciseEditor}>
+                ✕
+              </button>
+            </div>
+
+            <div className="careplans-modal-body">
+              <div className="careplans-field">
+                <div className="careplans-label">Name</div>
+                <input className="inline-input" value={exerciseName} onChange={(e) => setExerciseName(e.target.value)} />
+              </div>
+
+              <div className="careplans-field">
+                <div className="careplans-label">Instructions</div>
+                <textarea
+                  className="inline-input careplans-textarea"
+                  value={exerciseInstructions}
+                  onChange={(e) => setExerciseInstructions(e.target.value)}
+                />
+              </div>
+
+              <div className="careplans-field">
+                <div className="careplans-label">Tags (comma separated)</div>
+                <input
+                  className="inline-input"
+                  value={exerciseTags}
+                  onChange={(e) => setExerciseTags(e.target.value)}
+                  placeholder="knee, rehab, strength"
+                />
+              </div>
+
+              <div className="careplans-field">
+                <div className="careplans-label">Scope</div>
+                <select className="inline-input" value={exerciseScope} onChange={(e) => setExerciseScope(e.target.value)}>
+                  <option value="global">Global</option>
+                  <option value="user">My</option>
+                </select>
+              </div>
+
+              {exerciseEditorError ? <div className="careplans-empty">{exerciseEditorError}</div> : null}
+
+              <div className="careplans-modal-actions">
+                <button type="button" className="header-chip-btn" onClick={closeExerciseEditor}>
+                  Cancel
+                </button>
+                <button type="button" className="header-chip-btn" onClick={saveExerciseEditor}>
+                  Save
                 </button>
               </div>
             </div>

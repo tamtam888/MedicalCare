@@ -113,9 +113,35 @@ export default function PatientDetailsPage({
 
   const [editablePatient, setEditablePatient] = useState(patientFromStore);
 
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState(() => new Set());
+
   useEffect(() => {
     setEditablePatient(patientFromStore);
   }, [patientFromStore]);
+
+  useEffect(() => {
+    setSelectedHistoryIds(new Set());
+  }, [editablePatient?.idNumber]);
+
+  const toggleHistorySelected = (entryId) => {
+    const id = String(entryId || "");
+    if (!id) return;
+
+    setSelectedHistoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelectedHistory = () => setSelectedHistoryIds(new Set());
+
+  const selectedHistoryEntries = useMemo(() => {
+    const all = Array.isArray(editablePatient?.history) ? editablePatient.history : [];
+    if (!selectedHistoryIds.size) return [];
+    return all.filter((e) => selectedHistoryIds.has(String(e?.id || "")));
+  }, [editablePatient?.history, selectedHistoryIds]);
 
   const updatePatient = (updated) => {
     setEditablePatient(updated);
@@ -326,12 +352,21 @@ export default function PatientDetailsPage({
 
       <section className="patient-card">
         <h2 className="section-title">History and reports</h2>
-        <PatientHistory patient={editablePatient} history={editablePatient.history || []} onChangeHistory={updateHistory} />
+        <PatientHistory
+          patient={editablePatient}
+          history={editablePatient.history || []}
+          onChangeHistory={updateHistory}
+          selectedIds={selectedHistoryIds}
+          onToggleSelected={toggleHistorySelected}
+        />
         <AttachReports
+          patient={editablePatient}
           patientId={editablePatient.idNumber}
           existingReports={editablePatient.reports || []}
           onAddReport={onAddReportLocal}
           onDeleteReport={handleDeleteReport}
+          selectedEntries={selectedHistoryEntries}
+          onClearSelected={clearSelectedHistory}
         />
       </section>
     </div>

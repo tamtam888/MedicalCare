@@ -1,3 +1,6 @@
+// utils/fhirPatient.js
+import { medplum } from "../medplumClient";
+
 export const ID_SYSTEM = "https://medicalcare.local/id-number";
 
 export function ensureArray(v) {
@@ -8,9 +11,22 @@ export function trimId(v) {
   return String(v ?? "").trim();
 }
 
+/**
+ * ✅ FIX:
+ * Don't rely on a hard-coded localStorage key.
+ * Ask the Medplum client if we have a session (token/profile).
+ */
 export function hasMedplumSession() {
   try {
-    return !!localStorage.getItem("medplum:access_token");
+    const token =
+      typeof medplum?.getAccessToken === "function" ? medplum.getAccessToken() : null;
+    if (token && String(token).trim().length > 10) return true;
+
+    const profile =
+      typeof medplum?.getProfile === "function" ? medplum.getProfile() : null;
+    if (profile && typeof profile === "object" && profile.resourceType) return true;
+
+    return false;
   } catch {
     return false;
   }
@@ -45,7 +61,6 @@ function getAddr(p) {
 function pickStreet(p) {
   const addr = getAddr(p);
   const line0 = Array.isArray(addr?.line) ? addr.line[0] : undefined;
-
   return firstNonEmpty(p?.street, addr?.street, addr?.line1, line0, "");
 }
 
@@ -159,10 +174,93 @@ export function fromFhirPatient(fhir) {
   });
 }
 
-export function historyItemToObservation() {
-  throw new Error("historyItemToObservation not implemented");
+/**
+ * ✅ Implemented:
+ * Convert one local "history item" into an Observation for Medplum.
+ *
+ * history item shape in your app:
+ * { id, type, title, date, summary, audioData }
+ */
+export function historyItemToObservation(patient, historyItem, index = 0) {
+  const p = normalizePatient(patient);
+  const it = historyItem && typeof historyItem === "object" ? historyItem : {};
+
+  const when = it.date || new Date().toISOString();
+  const title = String(it.title || "History item").trim() || "History item";
+  const summary = String(it.summary || "").trim();
+
+  const obs = {
+    resourceType: "Observation",
+    status: "final",
+    subject: p.medplumId ? { reference: `Patient/${p.medplumId}` } : undefined,
+    effectiveDateTime: when,
+    code: { text: title },
+    note: summary ? [{ text: summary }] : [],
+  };
+
+  // keep your existing audio extension convention
+  if (it.audioData) {
+    obs.extension = [
+      {
+        url: "https://medicalcare.local/extension/audioData",
+        valueString: String(it.audioData),
+      },
+    ];
+  }
+
+  // optional: tag the type if you want (doesn't break anything)
+  const t = String(it.type || "").trim();
+  if (t) {
+    obs.category = [{ text: t }];
+  }
+
+  // avoid setting obs.id (server will assign). Keep client reference in identifier if needed.
+  const localId = String(it.id || "").trim();
+  if (localId) {
+    obs.identifier = [
+      {
+        system: "https://medicalcare.local/history-item-id",
+        value: localId,
+      },
+    ];
+  }
+
+  return obs;
 }
 
-export function reportToDiagnosticReport() {
-  throw new Error("reportToDiagnosticReport not implemented");
+/**
+ * ✅ Implemented:
+ * Convert one local report meta into a DiagnosticReport for Medplum.
+ *
+ * report shape in your app:
+ * { id, name, type, date, uploadedAt, description }
+ */
+export function reportToDiagnosticReport(patient, report, index = 0) {
+  const p = normalizePatient(patient);
+  const r = report && typeof report === "object" ? report : {};
+
+  const when = r.uploadedAt || r.date || new Date().toISOString();
+  const name = String(r.name || r.type || "Report").trim() || "Report";
+  const desc = String(r.description || "").trim();
+
+  const dr = {
+    resourceType: "DiagnosticReport",
+    status: "final",
+    subject: p.medplumId ? { reference: `Patient/${p.medplumId}` } : undefined,
+    effectiveDateTime: when,
+    code: { text: name },
+    conclusion: desc || undefined,
+  };
+
+  const localId = String(r.id || "").trim();
+  if (localId) {
+    dr.identifier = [
+      {
+        system: "https://medicalcare.local/report-id",
+        value: localId,
+      },
+    ];
+  }
+
+  return dr;
 }
