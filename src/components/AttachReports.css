@@ -1,170 +1,246 @@
-/* Container inside the patient card */
-.reports-container {
-  margin-top: 1.25rem; /* space below PatientHistory */
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.reports-surface {
+  width: 100%;
+  border: 1px solid rgba(143, 110, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(143, 110, 255, 0.03);
+  padding: 14px;
 }
 
-/* Row with upload button and error text */
-.reports-upload-row {
+.reports-top {
   display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
-/* Upload label wraps the hidden input */
-.file-upload-label {
-  display: inline-flex;
+.reports-top-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reports-kicker {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.reports-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
 }
 
-/* Pretty upload button */
-.file-upload-button {
+.reports-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.95rem;
+  justify-content: center;
+  padding: 0.42rem 0.95rem;
   border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background-color: #f9fafb;
+  border: 1px solid rgba(143, 110, 255, 0.55);
+  background: rgba(255, 255, 255, 0.92);
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #111827;
-  box-shadow: 0 2px 5px rgba(148, 163, 184, 0.35);
-  transition:
-    background-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.08s ease;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgba(111, 74, 232, 1);
+  box-shadow: 0 8px 20px rgba(143, 110, 255, 0.10);
+  transition: background-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
 }
 
-.file-upload-button:hover {
-  background-color: #eef2ff;
-  box-shadow: 0 3px 8px rgba(129, 140, 248, 0.4);
+.reports-pill:hover {
+  border-color: rgba(143, 110, 255, 0.75);
+  background: rgba(143, 110, 255, 0.08);
   transform: translateY(-1px);
 }
 
-.file-upload-icon {
-  font-size: 1rem;
+.reports-pill:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.file-upload-text {
-  line-height: 1;
+.reports-pill-muted {
+  color: #111827;
+  border-color: rgba(17, 24, 39, 0.18);
 }
 
-/* Hide the native file input */
-.file-upload-input {
-  display: none;
+.reports-pill-muted:hover {
+  background: rgba(17, 24, 39, 0.04);
+  border-color: rgba(17, 24, 39, 0.22);
 }
 
-/* Error text */
-.error-text {
-  font-size: 0.8rem;
+.reports-upload {
+  position: relative;
+  overflow: hidden;
+}
+
+.reports-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reports-textarea {
+  width: 100%;
+  border: 1px solid rgba(143, 110, 255, 0.22);
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 0.92rem;
+  outline: none;
+  resize: vertical;
+  background: #ffffff;
+  color: #111827;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.reports-textarea:focus {
+  border-color: rgba(143, 110, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(143, 110, 255, 0.14);
+}
+
+.reports-textarea-patient {
+  min-height: 160px;
+}
+
+.reports-textarea-report {
+  min-height: 280px;
+  margin-top: 10px;
+}
+
+.reports-divider {
+  height: 1px;
+  background: rgba(143, 110, 255, 0.16);
+  margin: 12px 0;
+}
+
+.reports-actions-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.reports-errors {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reports-error {
+  font-size: 0.84rem;
   color: #b91c1c;
+  font-weight: 600;
 }
 
-/* Empty state */
-.empty-state {
-  margin: 0.25rem 0 0 0;
+.reports-uploaded {
+  margin-top: 14px;
+  border-top: 1px solid rgba(143, 110, 255, 0.16);
+  padding-top: 12px;
+}
+
+.reports-empty {
   font-size: 0.88rem;
   color: #6b7280;
+  margin-top: 6px;
 }
 
-/* Reports list */
-.report-list {
+.reports-list {
   list-style: none;
-  margin: 0.5rem 0 0 0;
+  margin: 10px 0 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 10px;
 }
 
-/* Single report item */
-.report-item {
+.reports-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.8rem;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background-color: #f9fafb;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(143, 110, 255, 0.18);
+  background: #ffffff;
 }
 
-/* Left side: icon + name + meta */
-.report-main {
+.reports-item-left {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 10px;
+  min-width: 0;
 }
 
-.report-icon {
-  font-size: 1.2rem;
+.reports-icon {
+  font-size: 1.15rem;
 }
 
-.report-info {
+.reports-item-info {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 2px;
+  min-width: 0;
 }
 
-.report-name {
+.reports-item-name {
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
 }
 
-.report-meta {
-  font-size: 0.8rem;
+.reports-item-meta {
+  font-size: 0.82rem;
   color: #6b7280;
 }
 
-/* Right side: actions */
-.report-actions {
+.reports-item-actions {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-/* Make sure buttons look compact here */
-.report-actions .secondary-button,
-.report-actions .danger-button {
-  padding: 0.3rem 0.7rem;
-  font-size: 0.8rem;
+.reports-small {
+  padding: 0.28rem 0.72rem;
+  font-size: 0.82rem;
   border-radius: 999px;
+  border: 1px solid rgba(143, 110, 255, 0.35);
+  background: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+  color: #111827;
 }
 
-/* Responsive: stack actions under main on small screens */
-@media (max-width: 600px) {
-  .report-item {
+.reports-small:hover {
+  background: rgba(143, 110, 255, 0.08);
+}
+
+.reports-small-danger {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+@media (max-width: 720px) {
+  .reports-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
   }
 
-  .report-actions {
-    justify-content: flex-start;
+  .reports-item-actions {
     width: 100%;
+    justify-content: flex-start;
   }
 
-  .report-actions .secondary-button,
-  .report-actions .danger-button {
-    flex: 1;
-    min-width: 0;
+  .reports-item-name {
+    max-width: 100%;
   }
-}
-
-/* RTL support */
-[dir="rtl"] .report-item {
-  text-align: right;
-}
-
-[dir="rtl"] .report-main {
-  flex-direction: row-reverse;
-}
-
-[dir="rtl"] .report-actions {
-  flex-direction: row-reverse;
 }
