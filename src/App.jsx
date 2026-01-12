@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { usePatients } from "./hooks/usePatients";
@@ -67,9 +68,7 @@ function App() {
   const handleConnectMedplum = async () => {
     try {
       if (medplum.isAuthenticated()) {
-        const confirmDisconnect = window.confirm(
-          "Are you sure you want to disconnect from Medplum?"
-        );
+        const confirmDisconnect = window.confirm("Are you sure you want to disconnect from Medplum?");
         if (confirmDisconnect) {
           await medplum.signOut();
           setMedplumProfile(null);
@@ -96,18 +95,10 @@ function App() {
       <div className="app-main-area">
         <header className="app-header">
           <div className="app-header-right">
-            <button
-              type="button"
-              className="header-icon-button"
-              title="Settings"
-            >
+            <button type="button" className="header-icon-button" title="Settings">
               ⚙️
             </button>
-            <button
-              type="button"
-              className="primary-button medplum-header-button"
-              onClick={handleConnectMedplum}
-            >
+            <button type="button" className="primary-button medplum-header-button" onClick={handleConnectMedplum}>
               {medplumProfile ? "Medplum: Connected" : "Connect to Medplum"}
             </button>
           </div>
@@ -115,13 +106,9 @@ function App() {
 
         <main className="app-main">
           <Routes>
-            {/* default redirect */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            <Route
-              path="/dashboard"
-              element={<DashboardPage patients={patients} />}
-            />
+            <Route path="/dashboard" element={<DashboardPage patients={patients} />} />
 
             <Route
               path="/patients"
@@ -134,6 +121,7 @@ function App() {
                   onImportPatients={patientsState.handleImportPatients}
                   onExportPatients={patientsState.handleExportPatients}
                   onSelectPatient={patientsState.handleSelectPatient}
+                  handleSyncAllToMedplum={patientsState.handleSyncAllToMedplum}
                 />
               }
             />
@@ -144,94 +132,44 @@ function App() {
                 <PatientDetailsPage
                   patients={patientsState.patients}
                   selectedPatient={patientsState.selectedPatient}
-                  selectedPatientFullName={
-                    patientsState.selectedPatientFullName
-                  }
+                  selectedPatientFullName={patientsState.selectedPatientFullName}
                   handleSelectPatient={patientsState.handleSelectPatient}
                   handleAddReport={patientsState.handleAddReport}
                   handleDeleteReport={patientsState.handleDeleteReport}
-                  handleSaveTranscription={
-                    patientsState.handleSaveTranscription
-                  }
+                  handleSaveTranscription={patientsState.handleSaveTranscription}
                   handleEditPatient={patientsState.handleEditPatient}
                   onUpdatePatient={patientsState.handleUpdatePatientInline}
                   handleExportPatients={patientsState.handleExportPatients}
                   handleImportPatients={patientsState.handleImportPatients}
+                  handleSaveReportEntry={patientsState.handleSaveReportEntry}
+                  handleSyncPatientToMedplum={patientsState.handleSyncPatientToMedplum}
                 />
               }
             />
 
             <Route
               path="/data/treatment"
-              element={
-                <SimplePage
-                  title="Treatment data"
-                  text="Analyze treatment records. (Coming soon)"
-                />
-              }
+              element={<SimplePage title="Treatment data" text="Analyze treatment records. (Coming soon)" />}
             />
 
             <Route
               path="/data/care-plan"
-              element={
-                <CarePlansPage
-                  patients={patientsState.patients}
-                  onUpdatePatient={patientsState.handleUpdatePatientInline}
-                />
-              }
+              element={<CarePlansPage patients={patientsState.patients} onUpdatePatient={patientsState.handleUpdatePatientInline} />}
             />
 
             <Route
               path="/data/appointment"
-              element={
-                <SimplePage
-                  title="Appointments data"
-                  text="Appointment data view. (Coming soon)"
-                />
-              }
+              element={<SimplePage title="Appointments data" text="Appointment data view. (Coming soon)" />}
             />
 
-            <Route
-              path="/analytics"
-              element={
-                <SimplePage
-                  title="Analytics"
-                  text="Dashboards and reports. (Coming soon)"
-                />
-              }
-            />
+            <Route path="/analytics" element={<SimplePage title="Analytics" text="Dashboards and reports. (Coming soon)" />} />
 
-            <Route
-              path="/security"
-              element={
-                <SimplePage
-                  title="Security"
-                  text="Security and permissions. (Coming soon)"
-                />
-              }
-            />
+            <Route path="/security" element={<SimplePage title="Security" text="Security and permissions. (Coming soon)" />} />
 
-            <Route
-              path="/api"
-              element={
-                <SimplePage
-                  title="API"
-                  text="API configuration. (Coming soon)"
-                />
-              }
-            />
+            <Route path="/api" element={<SimplePage title="API" text="API configuration. (Coming soon)" />} />
 
-            <Route
-              path="/settings"
-              element={
-                <SimplePage
-                  title="Settings"
-                  text="Application settings. (Coming soon)"
-                />
-              }
-            />
+            <Route path="/settings" element={<SimplePage title="Settings" text="Application settings. (Coming soon)" />} />
 
-            {/* catch-all: any unknown path -> patients list */}
             <Route path="*" element={<Navigate to="/patients" replace />} />
           </Routes>
         </main>

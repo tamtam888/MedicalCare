@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+// src/pages/PatientDetailsPage.jsx
+import React, { useEffect, useMemo, useState, useId } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./PatientDetailsPage.css";
 
@@ -7,6 +8,7 @@ import PatientHistory from "../components/PatientHistory";
 import AttachReports from "../components/AttachReports";
 import CarePlanSection from "../components/CarePlanSection";
 import { formatDateDMY, parseFlexibleDate } from "../utils/dateFormat";
+import { Upload, Download, RefreshCw, X } from "lucide-react";
 
 function buildFullName(p) {
   const first = (p?.firstName || "").trim();
@@ -91,15 +93,66 @@ function formatDobForHeader(p) {
   return formatDateDMY(d);
 }
 
+function pickMedplumPatientId(p) {
+  const candidates = [
+    p?.medplumPatientId,
+    p?.medplumId,
+    p?.medplumPatient,
+    p?.fhirId,
+    p?.fhirPatientId,
+    p?.resourceId,
+    p?.id,
+  ];
+
+  for (const c of candidates) {
+    const v = String(c || "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
+function CollapsibleBlock({ title, subtitle = "", defaultOpen = false, children }) {
+  const rid = useId();
+  const panelId = `pd_panel_${String(rid).replace(/:/g, "")}`;
+  const btnId = `pd_btn_${String(rid).replace(/:/g, "")}`;
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+
+  return (
+    <div className="pd-card">
+      <button
+        id={btnId}
+        type="button"
+        className="pd-header-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open ? "true" : "false"}
+        aria-controls={panelId}
+      >
+        <span className="pd-header-left">
+          <span className="pd-title">{title}</span>
+          {subtitle ? <span className="pd-subtitle">{subtitle}</span> : null}
+        </span>
+        <span className={`pd-chevron ${open ? "open" : ""}`} aria-hidden="true">
+          ▾
+        </span>
+      </button>
+
+      <div id={panelId} role="region" aria-labelledby={btnId} className={`pd-panel ${open ? "open" : ""}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function PatientDetailsPage({
   patients = [],
   onUpdatePatient,
   handleSelectPatient,
   handleSaveTranscription,
-  handleAddReport,
   handleDeleteReport,
   handleExportPatients,
   handleImportPatients,
+  handleSaveReportEntry,
+  handleSyncPatientToMedplum,
 }) {
   const navigate = useNavigate();
   const params = useParams();
@@ -112,7 +165,6 @@ export default function PatientDetailsPage({
   }, [patients, idNumberParam]);
 
   const [editablePatient, setEditablePatient] = useState(patientFromStore);
-
   const [selectedHistoryIds, setSelectedHistoryIds] = useState(() => new Set());
 
   useEffect(() => {
@@ -164,7 +216,8 @@ export default function PatientDetailsPage({
   };
 
   const handleImportChange = (e) => {
-    if (typeof handleImportPatients === "function") handleImportPatients(e);
+    const file = e?.target?.files?.[0] || null;
+    if (typeof handleImportPatients === "function") handleImportPatients(file);
     if (e?.target) e.target.value = "";
   };
 
@@ -188,32 +241,16 @@ export default function PatientDetailsPage({
 
     if (!text && !audioId) return;
 
-    const entry = {
-      id: crypto?.randomUUID?.() ?? `h_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      type: "transcription",
-      date: new Date(createdAt).toISOString(),
-      title: "Treatment transcription",
-      summary: text,
-      audioId: audioId || null,
-      audioUrl: "",
-      audioData: null,
-    };
-
-    const nextHistory = [entry, ...(Array.isArray(editablePatient.history) ? editablePatient.history : [])];
-
-    updateHistory(nextHistory);
-
     handleSelectPatient?.(patientId);
     if (typeof handleSaveTranscription === "function") {
       handleSaveTranscription(patientId, text, audioId || null);
     }
   };
 
-  const onAddReportLocal = (meta) => {
+  const handleClickSyncPatient = () => {
     const patientId = editablePatient?.idNumber;
     if (!patientId) return;
-    handleSelectPatient?.(patientId);
-    handleAddReport?.(patientId, meta);
+    if (typeof handleSyncPatientToMedplum === "function") handleSyncPatientToMedplum(patientId);
   };
 
   if (!editablePatient) {
@@ -222,7 +259,7 @@ export default function PatientDetailsPage({
         <div className="patient-card">
           <h2 className="section-title">Patient profile</h2>
           <div className="empty-state">Patient not found.</div>
-          <button type="button" className="header-chip-btn" onClick={() => navigate("/patients")}>
+          <button type="button" className="patients-toolbar-button" onClick={() => navigate("/patients")}>
             Back to patients list
           </button>
         </div>
@@ -234,13 +271,26 @@ export default function PatientDetailsPage({
   const statusPill = getStatusPillClass(editablePatient);
   const dobFormatted = formatDobForHeader(editablePatient);
 
+  const detailsSubtitleParts = [];
+  if (String(editablePatient.phone || "").trim()) detailsSubtitleParts.push("phone");
+  if (String(editablePatient.email || "").trim()) detailsSubtitleParts.push("email");
+  if (String(editablePatient.address || "").trim()) detailsSubtitleParts.push("address");
+  const detailsSubtitle = detailsSubtitleParts.length ? detailsSubtitleParts.join(" • ") : "Edit contact details";
+
+  const historyCount = Array.isArray(editablePatient.history) ? editablePatient.history.length : 0;
+  const selectedCount = selectedHistoryEntries.length;
+  const historySubtitle = `${selectedCount} selected • ${historyCount} entries`;
+
+  const reportsUploadedCount = Array.isArray(editablePatient.reports) ? editablePatient.reports.length : 0;
+  const reportsSubtitle = `${selectedCount} selected • ${reportsUploadedCount} uploaded`;
+
+  const medplumPatientId = pickMedplumPatientId(editablePatient);
+
   return (
     <div className="patient-details-page">
       <div className={headerClass}>
         <div className="patient-header-left">
-          <div className={`patient-avatar-details ${getGenderClass(editablePatient)}`}>
-            {buildInitials(editablePatient)}
-          </div>
+          <div className={`patient-avatar-details ${getGenderClass(editablePatient)}`}>{buildInitials(editablePatient)}</div>
 
           <div className="patient-header-title-block">
             <h1 className="patient-details-name">{buildFullName(editablePatient)}</h1>
@@ -266,109 +316,123 @@ export default function PatientDetailsPage({
           </div>
         </div>
 
-        <div className="patient-header-actions">
-          <button type="button" className="header-chip-btn header-chip-close" onClick={handleClose}>
-            Close
+        <div className="patients-page-header-actions">
+          <button type="button" className="patients-toolbar-button" onClick={handleClose}>
+            <span className="patients-toolbar-button-icon">
+              <X size={16} />
+            </span>
+            <span>Close</span>
           </button>
 
-          <button type="button" className="header-chip-btn" onClick={handleExportClick}>
-            Export patient (FHIR JSON)
+          <button type="button" className="patients-toolbar-button" onClick={handleClickSyncPatient}>
+            <span className="patients-toolbar-button-icon">
+              <RefreshCw size={16} />
+            </span>
+            <span>Sync Patient</span>
           </button>
 
-          <label className="header-chip-btn header-chip-import">
-            <span>Import patient</span>
-            <input
-              type="file"
-              accept="application/json"
-              className="header-import-input"
-              onChange={handleImportChange}
-            />
+          <button type="button" className="patients-toolbar-button" onClick={handleExportClick}>
+            <span className="patients-toolbar-button-icon">
+              <Download size={16} />
+            </span>
+            <span>Export JSON</span>
+          </button>
+
+          <label className="patients-toolbar-button" style={{ cursor: "pointer" }}>
+            <span className="patients-toolbar-button-icon">
+              <Upload size={16} />
+            </span>
+            <span>Import</span>
+            <input type="file" accept="application/json" style={{ display: "none" }} onChange={handleImportChange} />
           </label>
         </div>
       </div>
 
-      <section className="patient-card">
-        <h2 className="section-title">Patient details</h2>
+      <div className="patient-sections-stack">
+        <CollapsibleBlock title="Patient details" subtitle={detailsSubtitle} defaultOpen={false}>
+          <div className="patient-details-top-row">
+            <div className="details-row-inline">
+              <span className="details-label">Phone</span>
+              <InlineEditable
+                value={editablePatient.phone || ""}
+                placeholder="Add phone number"
+                inputType="tel"
+                onChange={(val) => updateField("phone", val)}
+                className="details-value"
+              />
+            </div>
 
-        <div className="patient-details-top-row">
-          <div className="details-row-inline">
-            <span className="details-label">Phone</span>
-            <InlineEditable
-              value={editablePatient.phone || ""}
-              placeholder="Add phone number"
-              inputType="tel"
-              onChange={(val) => updateField("phone", val)}
-              className="details-value"
-            />
+            <div className="details-row-inline">
+              <span className="details-label">Email</span>
+              <InlineEditable value={editablePatient.email || ""} placeholder="Add email" onChange={(val) => updateField("email", val)} className="details-value" />
+            </div>
+
+            <div className="details-row-inline">
+              <span className="details-label">Address</span>
+              <InlineEditable
+                value={editablePatient.address || ""}
+                placeholder="Street, city, country"
+                onChange={(val) => updateField("address", val)}
+                className="details-value"
+              />
+            </div>
           </div>
 
-          <div className="details-row-inline">
-            <span className="details-label">Email</span>
-            <InlineEditable
-              value={editablePatient.email || ""}
-              placeholder="Add email"
-              onChange={(val) => updateField("email", val)}
-              className="details-value"
-            />
+          <div className="status-row">
+            <span className="details-label">Clinical status</span>
+            <select className="inline-input status-select" value={editablePatient.clinicalStatus || ""} onChange={(e) => updateField("clinicalStatus", e.target.value)}>
+              <option value="">Not Active</option>
+              <option value="Active">Active</option>
+              <option value="Stable">Stable</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Disabled">Disabled</option>
+              <option value="Not Active">Not Active</option>
+            </select>
           </div>
+        </CollapsibleBlock>
 
-          <div className="details-row-inline">
-            <span className="details-label">Address</span>
-            <InlineEditable
-              value={editablePatient.address || ""}
-              placeholder="Street, city, country"
-              onChange={(val) => updateField("address", val)}
-              className="details-value"
-            />
-          </div>
-        </div>
+        <CollapsibleBlock title="Treatment transcription" subtitle="Record and improve visit notes" defaultOpen={true}>
+          <RecordAudio selectedPatient={editablePatient} onSaveTranscription={onSaveTranscriptionLocal} />
+        </CollapsibleBlock>
 
-        <div className="status-row">
-          <span className="details-label">Clinical status</span>
-          <select
-            className="inline-input status-select"
-            value={editablePatient.clinicalStatus || ""}
-            onChange={(e) => updateField("clinicalStatus", e.target.value)}
-          >
-            <option value="">Not Active</option>
-            <option value="Active">Active</option>
-            <option value="Stable">Stable</option>
-            <option value="Inactive">Inactive</option>
-            <option value="Disabled">Disabled</option>
-            <option value="Not Active">Not Active</option>
-          </select>
-        </div>
-      </section>
+        <CollapsibleBlock title="Care plan" subtitle="Goals and exercises" defaultOpen={false}>
+          <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} />
+        </CollapsibleBlock>
 
-      <section className="patient-card">
-        <h2 className="section-title">Treatment transcription</h2>
-        <RecordAudio selectedPatient={editablePatient} onSaveTranscription={onSaveTranscriptionLocal} />
-      </section>
+        <CollapsibleBlock title="History" subtitle={historySubtitle} defaultOpen={false}>
+          <PatientHistory patient={editablePatient} history={editablePatient.history || []} onChangeHistory={updateHistory} selectedIds={selectedHistoryIds} onToggleSelected={toggleHistorySelected} />
+        </CollapsibleBlock>
 
-      <section className="patient-card patient-careplan-card">
-        <h2 className="section-title">Care plan</h2>
-        <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} />
-      </section>
+        <CollapsibleBlock title="Reports" subtitle={reportsSubtitle} defaultOpen={false}>
+          <AttachReports
+            patient={editablePatient}
+            patientId={editablePatient.idNumber}
+            existingReports={editablePatient.reports || []}
+            onDeleteReport={handleDeleteReport}
+            selectedEntries={selectedHistoryEntries}
+            onClearSelected={clearSelectedHistory}
+            totalHistoryCount={historyCount}
+            medplumPatientId={medplumPatientId}
+            onSaveReportEntry={(entry) => {
+              const patientId = editablePatient?.idNumber;
+              if (!patientId) return;
 
-      <section className="patient-card">
-        <h2 className="section-title">History and reports</h2>
-        <PatientHistory
-          patient={editablePatient}
-          history={editablePatient.history || []}
-          onChangeHistory={updateHistory}
-          selectedIds={selectedHistoryIds}
-          onToggleSelected={toggleHistorySelected}
-        />
-        <AttachReports
-          patient={editablePatient}
-          patientId={editablePatient.idNumber}
-          existingReports={editablePatient.reports || []}
-          onAddReport={onAddReportLocal}
-          onDeleteReport={handleDeleteReport}
-          selectedEntries={selectedHistoryEntries}
-          onClearSelected={clearSelectedHistory}
-        />
-      </section>
+              handleSelectPatient?.(patientId);
+
+              if (typeof handleSaveReportEntry === "function") {
+                handleSaveReportEntry(patientId, entry);
+                return;
+              }
+
+              const current = Array.isArray(editablePatient.history) ? editablePatient.history : [];
+              const existingIndex = current.findIndex((x) => String(x?.id || "") === String(entry?.id || ""));
+              const next =
+                existingIndex >= 0 ? current.map((x, idx) => (idx === existingIndex ? entry : x)) : [entry, ...current];
+              updateHistory(next);
+            }}
+          />
+        </CollapsibleBlock>
+      </div>
     </div>
   );
 }
