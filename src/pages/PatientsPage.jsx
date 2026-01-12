@@ -1,6 +1,7 @@
+// src/pages/PatientsPage.jsx
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, Download, Plus } from "lucide-react";
+import { Upload, Download, Plus, RefreshCw } from "lucide-react";
 import PatientList from "../components/PatientList";
 import PatientForm from "../components/PatientForm";
 import "./PatientsPage.css";
@@ -19,7 +20,8 @@ function PatientsPage(props) {
     handleDeletePatient,
     handleImportPatients,
     handleExportPatients,
-    handleSelectPatient
+    handleSelectPatient,
+    handleSyncAllToMedplum,
   } = props;
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,11 +41,7 @@ function PatientsPage(props) {
   }
 
   function callUpdatePatient(patient) {
-    const id =
-      patient?.idNumber ||
-      patient?.id ||
-      patient?.medplumId ||
-      null;
+    const id = patient?.idNumber || patient?.id || patient?.medplumId || null;
 
     if (typeof handleUpdatePatientInline === "function") {
       if (handleUpdatePatientInline.length >= 2) {
@@ -64,11 +62,7 @@ function PatientsPage(props) {
   }
 
   function callDeletePatient(patient) {
-    const id =
-      patient?.idNumber ||
-      patient?.id ||
-      patient?.medplumId ||
-      null;
+    const id = patient?.idNumber || patient?.id || patient?.medplumId || null;
 
     if (typeof handleDeletePatient === "function") {
       if (handleDeletePatient.length >= 2) {
@@ -95,10 +89,7 @@ function PatientsPage(props) {
       onSelectPatient(patient);
     }
 
-    const id =
-      patient?.idNumber ||
-      patient?.id ||
-      null;
+    const id = patient?.idNumber || patient?.id || null;
 
     if (id) {
       navigate(`/patients/${encodeURIComponent(id)}`);
@@ -137,11 +128,7 @@ function PatientsPage(props) {
         ? p.conditions.join(" ").toLowerCase()
         : String(p.conditions || "").toLowerCase();
 
-      return (
-        fullName.includes(term) ||
-        idValue.includes(term) ||
-        conditionsText.includes(term)
-      );
+      return fullName.includes(term) || idValue.includes(term) || conditionsText.includes(term);
     });
   }, [patients, searchTerm]);
 
@@ -184,14 +171,16 @@ function PatientsPage(props) {
     }
   }
 
+  function handleClickSyncAll() {
+    if (typeof handleSyncAllToMedplum === "function") handleSyncAllToMedplum();
+  }
+
   return (
     <div className="patients-page" dir="ltr">
       <div className="patients-page-header-row">
         <div className="patients-page-header-text">
           <h1 className="patients-page-title">Patient Directory</h1>
-          <p className="patients-page-subtitle">
-            Manage patients and their clinical details.
-          </p>
+          <p className="patients-page-subtitle">Manage patients and their clinical details.</p>
         </div>
 
         <div className="patients-page-header-actions">
@@ -203,33 +192,28 @@ function PatientsPage(props) {
             onChange={handleFileChange}
           />
 
-          <button
-            type="button"
-            className="patients-toolbar-button"
-            onClick={handleClickImport}
-          >
+          <button type="button" className="patients-toolbar-button" onClick={handleClickImport}>
             <span className="patients-toolbar-button-icon">
               <Upload size={16} />
             </span>
             <span>Import</span>
           </button>
 
-          <button
-            type="button"
-            className="patients-toolbar-button"
-            onClick={callExportPatients}
-          >
+          <button type="button" className="patients-toolbar-button" onClick={callExportPatients}>
             <span className="patients-toolbar-button-icon">
               <Download size={16} />
             </span>
             <span>Export JSON</span>
           </button>
 
-          <button
-            type="button"
-            className="patients-add-button"
-            onClick={handleClickAdd}
-          >
+          <button type="button" className="patients-toolbar-button" onClick={handleClickSyncAll}>
+            <span className="patients-toolbar-button-icon">
+              <RefreshCw size={16} />
+            </span>
+            <span>Sync All</span>
+          </button>
+
+          <button type="button" className="patients-add-button" onClick={handleClickAdd}>
             <span className="patients-toolbar-button-icon patients-add-button-icon">
               <Plus size={16} />
             </span>

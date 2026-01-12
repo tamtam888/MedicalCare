@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { formatDateDMY, formatDateTimeDMY } from "../utils/dateFormat";
+import { formatDateDMY, formatDateTimeDMY, parseFlexibleDate } from "../utils/dateFormat";
 import "./AttachReports.css";
 
 function AttachReports({
@@ -12,6 +12,7 @@ function AttachReports({
   selectedEntries,
   onClearSelected,
   onSaveReportEntry,
+  totalHistoryCount,
 }) {
   const [uploadError, setUploadError] = useState("");
   const [aiError, setAiError] = useState("");
@@ -19,6 +20,7 @@ function AttachReports({
 
   const [patientHeader, setPatientHeader] = useState("");
   const [reportText, setReportText] = useState("");
+  const [kpi, setKpi] = useState(null);
 
   const reports = Array.isArray(existingReports) ? existingReports : [];
   const selected = Array.isArray(selectedEntries) ? selectedEntries : [];
@@ -36,28 +38,29 @@ function AttachReports({
   const clearAll = () => {
     setPatientHeader("");
     setReportText("");
+    setKpi(null);
     setAiError("");
     setUploadError("");
   };
 
   const clearReportOnly = () => {
     setReportText("");
+    setKpi(null);
     setAiError("");
+  };
+
+  const formatDobDMY = (raw) => {
+    const d = parseFlexibleDate(raw);
+    if (!d) return "";
+    return formatDateDMY(d);
   };
 
   const fillPatientDetailsLocal = () => {
     const lines = [];
     const id = String(patientId || "").trim();
 
-    const rawDob =
-      patient?.dob ??
-      patient?.dateOfBirth ??
-      patient?.birthDate ??
-      patient?.birthDateTime ??
-      patient?.dobText ??
-      "";
-
-    const dobFormatted = formatDateDMY(rawDob);
+    const dobRaw = patient?.dob ?? patient?.dateOfBirth ?? patient?.birthDate ?? patient?.birthDateTime ?? "";
+    const dob = formatDobDMY(dobRaw);
 
     const phone = String(patient?.phone || "").trim();
     const email = String(patient?.email || "").trim();
@@ -65,7 +68,7 @@ function AttachReports({
 
     lines.push(`Patient Name: ${safePatientName || "______________________________"}`);
     lines.push(`Patient ID: ${id || "_______________________________"}`);
-    lines.push(`DOB: ${dobFormatted || "_____________________________________"}`);
+    lines.push(`DOB: ${dob || "_____________________________________"}`);
     if (phone) lines.push(`Phone: ${phone}`);
     if (email) lines.push(`Email: ${email}`);
     if (address) lines.push(`Address: ${address}`);
@@ -150,16 +153,9 @@ function AttachReports({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          language: "en",
-          format: "structured_text",
-          instructions: {
-            includePatientDetails: false,
-            requireFunctionalGoals: true,
-            requireGoalStatus: true,
-            tone: "clinical",
-          },
-          carePlan,
           visits,
+          carePlan,
+          totalHistoryCount: Number(totalHistoryCount || 0),
         }),
       });
 
@@ -169,14 +165,13 @@ function AttachReports({
       }
 
       const data = await res.json().catch(() => ({}));
-      const text =
-        String(data?.text || "").trim() ||
-        String(data?.markdown || "").trim() ||
-        String(data?.output || "").trim();
+      const nextReportText = String(data?.reportText || data?.text || data?.markdown || "").trim();
+      const nextKpi = data?.kpi && typeof data.kpi === "object" ? data.kpi : null;
 
-      if (!text) throw new Error("Empty AI response");
+      if (!nextReportText) throw new Error("Empty AI response");
 
-      setReportText(text);
+      setReportText(nextReportText);
+      setKpi(nextKpi);
     } catch {
       setAiError("Failed to generate AI report. Check server logs and API key.");
     } finally {
@@ -226,6 +221,44 @@ function AttachReports({
     URL.revokeObjectURL(url);
   };
 
+  const kpiLines = (k) => {
+    if (!k) return [];
+    const lines = [];
+
+    const rp = String(k.reportingPeriod || "").trim();
+    if (rp) lines.push(`Reporting Period: ${rp}`);
+
+    const ss = Number.isFinite(Number(k.sessionsSelected)) ? Number(k.sessionsSelected) : null;
+    const st = Number.isFinite(Number(k.sessionsTotal)) ? Number(k.sessionsTotal) : null;
+    if (ss !== null && st !== null) lines.push(`Sessions: ${ss} / ${st}`);
+    else if (ss !== null) lines.push(`Sessions Selected: ${ss}`);
+
+    const g = k.goals && typeof k.goals === "object" ? k.goals : null;
+    if (g) {
+      const total = Number.isFinite(Number(g.total)) ? Number(g.total) : null;
+      const achieved = Number.isFinite(Number(g.achieved)) ? Number(g.achieved) : null;
+      const inProgress = Number.isFinite(Number(g.inProgress)) ? Number(g.inProgress) : null;
+      const notAchieved = Number.isFinite(Number(g.notAchieved)) ? Number(g.notAchieved) : null;
+
+      if (total !== null) lines.push(`Goals: ${total}`);
+      if (achieved !== null || inProgress !== null || notAchieved !== null) {
+        const parts = [];
+        if (achieved !== null) parts.push(`Achieved: ${achieved}`);
+        if (inProgress !== null) parts.push(`In progress: ${inProgress}`);
+        if (notAchieved !== null) parts.push(`Not achieved: ${notAchieved}`);
+        if (parts.length) lines.push(parts.join(" | "));
+      }
+    }
+
+    const fps = Number.isFinite(Number(k.functionalProgressScore)) ? Number(k.functionalProgressScore) : null;
+    if (fps !== null) lines.push(`Functional progress: ${fps} / 10`);
+
+    const trend = String(k.overallTrend || "").trim();
+    if (trend) lines.push(`Overall trend: ${trend}`);
+
+    return lines;
+  };
+
   const handleDownloadPdf = async () => {
     const content = String(reportText || "").trim();
     if (!content) return;
@@ -259,9 +292,7 @@ function AttachReports({
 
     y = drawLine("Treatment Report", y, 18);
     y = drawLine(`Generated: ${formatDateTimeDMY(new Date())}`, y, 10);
-    y -= 10;
-
-    y = drawLine("Patient details (paste manually):", y, 11);
+    y -= 8;
 
     const headerBlock = String(patientHeader || "").trim();
     const headerEffective = headerBlock
@@ -274,6 +305,9 @@ function AttachReports({
           "Reporting Period: ___________________________",
         ].join("\n");
 
+    y = ensureSpace(y);
+    y = drawLine("Patient details (local / paste):", y, 11);
+
     for (const line of wrapText(headerEffective, font, 10, maxWidth)) {
       y = ensureSpace(y);
       if (line === "") y -= 16;
@@ -281,8 +315,23 @@ function AttachReports({
     }
 
     y -= 10;
+
+    const lines = kpiLines(kpi);
+    if (lines.length) {
+      y = ensureSpace(y);
+      y = drawLine("Dashboard", y, 11);
+      y -= 2;
+
+      for (const line of lines) {
+        y = ensureSpace(y);
+        y = drawLine(line, y, 10);
+      }
+
+      y -= 10;
+    }
+
     y = ensureSpace(y);
-    y = drawLine("Report:", y, 11);
+    y = drawLine("Clinical report", y, 11);
     y -= 2;
 
     for (const line of wrapText(content, font, 10, maxWidth)) {
@@ -300,7 +349,7 @@ function AttachReports({
     const subject = encodeURIComponent("Treatment Report");
     const bodyParts = [];
 
-    bodyParts.push("PATIENT DETAILS (paste manually):");
+    bodyParts.push("PATIENT DETAILS (local / paste):");
     const headerText = String(patientHeader || "").trim();
     if (headerText) bodyParts.push(headerText);
     else {
@@ -311,8 +360,15 @@ function AttachReports({
       bodyParts.push("Reporting Period: ___________________________");
     }
 
+    const lines = kpiLines(kpi);
+    if (lines.length) {
+      bodyParts.push("");
+      bodyParts.push("DASHBOARD:");
+      bodyParts.push(...lines);
+    }
+
     bodyParts.push("");
-    bodyParts.push("REPORT:");
+    bodyParts.push("CLINICAL REPORT:");
     bodyParts.push("");
     const content = String(reportText || "").trim();
     if (content) bodyParts.push(content);
@@ -331,6 +387,7 @@ function AttachReports({
       date: new Date().toISOString(),
       title: "Treatment report",
       summary: content,
+      kpi: kpi && typeof kpi === "object" ? kpi : null,
       audioUrl: "",
       audioData: null,
       audioId: "",
@@ -384,13 +441,6 @@ function AttachReports({
     alert("Delete is not implemented yet in this MVP.");
   };
 
-  const formatUploadedAtDMY = (value) => {
-    const s = String(value || "").trim();
-    if (!s) return "";
-    const dmy = formatDateDMY(s);
-    return dmy || "";
-  };
-
   return (
     <div className="reports-surface">
       <div className="reports-top">
@@ -413,9 +463,7 @@ function AttachReports({
         className="reports-textarea reports-textarea-patient"
         value={patientHeader}
         onChange={(e) => setPatientHeader(e.target.value)}
-        placeholder={`Example:\nPatient Name: ${safePatientName}\nPatient ID: ${String(
-          patientId || ""
-        )}\nDOB: ...\nTherapist: ...\nReporting Period: ...`}
+        placeholder={`Example:\nPatient Name: ${safePatientName}\nPatient ID: ${String(patientId || "")}\nDOB: ${formatDateDMY(new Date())}\nTherapist: ...\nReporting Period: ...`}
       />
 
       <div className="reports-divider" />
@@ -480,7 +528,8 @@ function AttachReports({
                   <div className="reports-item-info">
                     <div className="reports-item-name">{report.name}</div>
                     <div className="reports-item-meta">
-                      {Math.round(report.size / 1024)} KB · {formatUploadedAtDMY(report.uploadedAt) || "-"}
+                      {Math.round(report.size / 1024)} KB ·{" "}
+                      {report.uploadedAt ? new Date(report.uploadedAt).toLocaleDateString() : ""}
                     </div>
                   </div>
                 </div>

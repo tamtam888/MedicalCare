@@ -17,11 +17,7 @@ function requireApiKey(req, res) {
   return apiKey;
 }
 
-function getModel() {
-  return process.env.OPENAI_MODEL || "gpt-4o-mini";
-}
-
-function buildChatPayload({ model, system, user, temperature = 0.2, max_tokens = 1200 }) {
+function buildChatPayload({ model, system, user, temperature = 0.3, max_tokens = 1200 }) {
   return {
     model,
     messages: [
@@ -54,134 +50,178 @@ async function callOpenAI({ apiKey, payload }) {
   return content;
 }
 
-function clampString(value, maxLen) {
-  return String(value || "").slice(0, maxLen);
+function safeJsonParse(s) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
 }
 
-function sanitizeVisits(visits) {
-  const arr = Array.isArray(visits) ? visits : [];
-  return arr.slice(0, 30).map((v, idx) => ({
-    visitNo: Number(v?.visitNo || idx + 1),
-    type: clampString(v?.type || "other", 40),
-    date: clampString(v?.date || "", 20),
-    title: clampString(v?.title || "", 160),
-    summary: clampString(v?.summary || "", 2400),
-    hasAudio: Boolean(v?.hasAudio),
-  }));
+function clampInt(n, min, max) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return min;
+  return Math.max(min, Math.min(max, Math.round(x)));
 }
 
-function sanitizeCarePlan(carePlan) {
-  if (!carePlan || typeof carePlan !== "object") return null;
+function normalizeKpi(kpi, context) {
+  const selectedCount = Number(context?.selectedCount || 0);
+  const totalHistoryCount = Number(context?.totalHistoryCount || 0);
 
-  const goalsRaw = Array.isArray(carePlan?.goals) ? carePlan.goals : [];
-  const exercisesRaw = Array.isArray(carePlan?.exercises) ? carePlan.exercises : [];
+  const k = kpi && typeof kpi === "object" ? kpi : {};
 
-  const goals = goalsRaw.slice(0, 30).map((g) => ({
-    title: clampString(g?.title || g?.name || g?.goal || "", 220),
-    status: clampString(g?.status || g?.state || "", 60),
-    target: clampString(g?.target || g?.targetDate || "", 80),
-    notes: clampString(g?.notes || g?.description || "", 500),
-  }));
+  const goals = k.goals && typeof k.goals === "object" ? k.goals : {};
+  const totalGoals = clampInt(goals.total ?? 0, 0, 999);
+  const achieved = clampInt(goals.achieved ?? 0, 0, 999);
+  const inProgress = clampInt(goals.inProgress ?? 0, 0, 999);
+  const notAchieved = clampInt(goals.notAchieved ?? 0, 0, 999);
 
-  const exercises = exercisesRaw.slice(0, 60).map((ex) => ({
-    name: clampString(ex?.name || ex?.title || ex?.exercise || "", 160),
-    instructions: clampString(ex?.instructions || ex?.description || "", 700),
-    dosage: clampString(ex?.dosage || ex?.frequency || ex?.reps || "", 120),
-  }));
+  const sessionsSelected = clampInt(k.sessionsSelected ?? selectedCount, 0, 9999);
+  const sessionsTotal = clampInt(k.sessionsTotal ?? totalHistoryCount, 0, 9999);
 
-  const hasAny = goals.some((g) => g.title || g.notes) || exercises.some((e) => e.name || e.instructions);
-  if (!hasAny) return null;
+  const functionalProgressScore = clampInt(k.functionalProgressScore ?? 5, 0, 10);
+  const trendRaw = String(k.overallTrend || "").trim();
+  const overallTrend =
+    trendRaw === "Improving" || trendRaw === "Stable" || trendRaw === "Declining" ? trendRaw : "Stable";
 
-  return { goals, exercises };
+  const reportingPeriod = String(k.reportingPeriod || "").trim();
+
+  return {
+    reportingPeriod,
+    sessionsSelected,
+    sessionsTotal,
+    goals: {
+      total: totalGoals,
+      achieved: achieved,
+      inProgress: inProgress,
+      notAchieved: notAchieved,
+    },
+    functionalProgressScore,
+    overallTrend,
+  };
 }
-
-function buildStructuredReportPrompt({ visits, carePlan }) {
-  const carePlanBlock = carePlan
-    ? [
-        "Care plan context (de-identified):",
-        JSON.stringify(carePlan, null, 2),
-        "",
-      ].join("\n")
-    : "Care plan context (de-identified): none provided\n";
-
-  const visitsBlock = [
-    "Selected visits (de-identified):",
-    JSON.stringify(visits, null, 2),
-  ].join("\n");
-
-  const instructions = [
-    "Write a structured clinical TREATMENT REPORT in English only.",
-    "Do NOT include patient identifying details (names, IDs, addresses, phone, email, exact DOB).",
-    "Do NOT invent personal data, diagnoses, test results, medications, or outcomes not present in the input.",
-    "Use clear section headings and bullet points.",
-    "Focus on FUNCTIONAL goals (real-life activities).",
-    "Where possible, assign goal status: Achieved / Partially Achieved / Not Achieved.",
-    "If goal status is unclear, mark as Partially Achieved and explain uncertainty briefly.",
-    "Extract exercises/interventions from input. If carePlan includes exercises, include them.",
-    "Summarize each selected visit with: what was done, response/difficulty/strengths, and plan/home program if mentioned.",
-    "Include a concise Progress Over Time section.",
-    "Include a Goal Attainment Summary with counts if possible.",
-    "End with Recommendations / Next Steps.",
-    "",
-    "Output format:",
-    "TREATMENT PURPOSE / PRIMARY GOAL",
-    "FUNCTIONAL GOALS (with status and evidence)",
-    "INTERVENTIONS & EXERCISES PERFORMED",
-    "SESSION SUMMARIES (Selected Visits)",
-    "PROGRESS OVER TIME",
-    "GOAL ATTAINMENT SUMMARY",
-    "RECOMMENDATIONS / NEXT STEPS",
-    "ADDITIONAL NOTES (Optional)",
-  ].join("\n");
-
-  return [
-    instructions,
-    "",
-    carePlanBlock,
-    visitsBlock,
-  ].join("\n");
-}
-
-app.get("/health", (req, res) => {
-  res.json({ ok: true });
-});
 
 app.post("/api/ai/treatment-report", async (req, res) => {
   try {
     const apiKey = requireApiKey(req, res);
     if (!apiKey) return;
 
-    const visits = sanitizeVisits(req.body?.visits);
+    const visits = Array.isArray(req.body?.visits) ? req.body.visits : [];
     if (!visits.length) return res.status(400).json({ error: "Missing visits" });
 
-    const carePlan = sanitizeCarePlan(req.body?.carePlan);
-    const model = getModel();
+    const carePlan = req.body?.carePlan && typeof req.body.carePlan === "object" ? req.body.carePlan : null;
+
+    const safeVisits = visits.slice(0, 30).map((v) => ({
+      visitNo: Number(v?.visitNo || 0),
+      type: String(v?.type || "other").slice(0, 40),
+      date: String(v?.date || "").slice(0, 20),
+      title: String(v?.title || "").slice(0, 160),
+      summary: String(v?.summary || "").slice(0, 2200),
+      hasAudio: Boolean(v?.hasAudio),
+    }));
+
+    const safeCarePlan = carePlan
+      ? {
+          goals: Array.isArray(carePlan?.goals)
+            ? carePlan.goals
+                .map((g) => ({
+                  title: String(g?.title || "").slice(0, 180),
+                  status: String(g?.status || "").slice(0, 60),
+                  target: String(g?.target || "").slice(0, 40),
+                  notes: String(g?.notes || "").slice(0, 500),
+                }))
+                .slice(0, 30)
+            : [],
+          exercises: Array.isArray(carePlan?.exercises)
+            ? carePlan.exercises
+                .map((ex) => ({
+                  name: String(ex?.name || "").slice(0, 160),
+                  instructions: String(ex?.instructions || "").slice(0, 700),
+                  dosage: String(ex?.dosage || "").slice(0, 120),
+                }))
+                .slice(0, 60)
+            : [],
+        }
+      : null;
+
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
     const system = [
-      "You are a clinical documentation assistant.",
-      "You produce structured treatment reports for clinicians.",
-      "English only.",
-      "Never include patient identifying information.",
-      "Never invent facts not present in the input.",
-      "Be concise, clinically useful, and clearly structured.",
-    ].join(" ");
+      "You write physical therapy clinical reports.",
+      "Return ONLY valid JSON. No markdown. No code fences.",
+      "Language: English only.",
+      "Do not include any patient identifying details.",
+      "Do not invent personal information.",
+      "Use only the provided input.",
+      "If information is missing, write 'Not specified'.",
+      "",
+      "Output JSON shape exactly:",
+      "{",
+      '  "kpi": {',
+      '    "reportingPeriod": "string",',
+      '    "sessionsSelected": number,',
+      '    "sessionsTotal": number,',
+      '    "goals": { "total": number, "achieved": number, "inProgress": number, "notAchieved": number },',
+      '    "functionalProgressScore": number,',
+      '    "overallTrend": "Improving|Stable|Declining"',
+      "  },",
+      '  "reportText": "string"',
+      "}",
+      "",
+      "KPI rules:",
+      "- functionalProgressScore must be 0-10 (integer).",
+      "- overallTrend must be one of: Improving, Stable, Declining.",
+      "- Goals should be functional when possible.",
+    ].join("\n");
 
-    const user = buildStructuredReportPrompt({ visits, carePlan });
+    const user = [
+      "Create a structured treatment report based on selected visits.",
+      "Include these sections in reportText with clear headings:",
+      "1) Reason for treatment / Primary complaint",
+      "2) Treatment goals (functional, measurable when possible)",
+      "3) Interventions performed (include exercises if mentioned)",
+      "4) Progress and response to treatment (strengths, difficulties)",
+      "5) Goal attainment status (achieved / in progress / not achieved)",
+      "6) Risks / red flags (if any; otherwise 'None noted')",
+      "7) Plan and recommendations for next sessions",
+      "",
+      "Also produce KPI summary in 'kpi'.",
+      "If care plan goals exist, align goals and statuses with them.",
+      "",
+      "Care plan context JSON (may be null):",
+      JSON.stringify(safeCarePlan, null, 2),
+      "",
+      "Selected visits JSON:",
+      JSON.stringify(safeVisits, null, 2),
+    ].join("\n");
 
-    const payload = buildChatPayload({
-      model,
-      system,
-      user,
-      temperature: 0.2,
-      max_tokens: 1400,
+    const payload = buildChatPayload({ model, system, user, temperature: 0.2, max_tokens: 1400 });
+    const raw = await callOpenAI({ apiKey, payload });
+
+    const parsed = safeJsonParse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return res.json({
+        kpi: normalizeKpi(null, { selectedCount: safeVisits.length, totalHistoryCount: 0 }),
+        reportText: String(raw || "").trim(),
+      });
+    }
+
+    const reportText = String(parsed?.reportText || "").trim();
+    const kpi = normalizeKpi(parsed?.kpi, {
+      selectedCount: safeVisits.length,
+      totalHistoryCount: Number(req.body?.totalHistoryCount || 0),
     });
 
-    const text = await callOpenAI({ apiKey, payload });
+    if (!reportText) {
+      return res.json({
+        kpi,
+        reportText: "Not specified.",
+      });
+    }
 
-    return res.json({ text, markdown: text });
-  } catch (e) {
-    const msg = String(e?.message || "Server error");
-    return res.status(500).json({ error: "Server error", details: msg.slice(0, 2000) });
+    return res.json({ kpi, reportText });
+  } catch {
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -193,32 +233,30 @@ app.post("/api/ai/improve-visit", async (req, res) => {
     const input = String(req.body?.text || "").trim();
     if (!input) return res.status(400).json({ error: "Missing text" });
 
-    const model = getModel();
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
     const system = [
       "You improve clinical visit summaries written by a clinician.",
-      "English only.",
+      "Language: English only.",
       "Preserve meaning. Do not add invented facts.",
       "Return a professional, clear, structured note.",
-      "Do not introduce patient identifying details unless already present in the provided text.",
+      "Use headings if helpful.",
     ].join(" ");
 
     const user = [
       "Rewrite the following visit summary to be more professional and clear.",
-      "Use headings and bullet points when helpful.",
-      "Do not add any new clinical facts.",
+      "Do not add new clinical facts.",
       "",
       "Text:",
       input,
     ].join("\n");
 
-    const payload = buildChatPayload({ model, system, user, temperature: 0.15, max_tokens: 700 });
+    const payload = buildChatPayload({ model, system, user, temperature: 0.2, max_tokens: 700 });
     const improved = await callOpenAI({ apiKey, payload });
 
     return res.json({ text: improved });
-  } catch (e) {
-    const msg = String(e?.message || "Server error");
-    return res.status(500).json({ error: "Server error", details: msg.slice(0, 2000) });
+  } catch {
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

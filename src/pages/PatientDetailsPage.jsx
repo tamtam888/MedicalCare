@@ -1,3 +1,4 @@
+// src/pages/PatientDetailsPage.jsx
 import React, { useEffect, useMemo, useState, useId } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./PatientDetailsPage.css";
@@ -7,6 +8,7 @@ import PatientHistory from "../components/PatientHistory";
 import AttachReports from "../components/AttachReports";
 import CarePlanSection from "../components/CarePlanSection";
 import { formatDateDMY, parseFlexibleDate } from "../utils/dateFormat";
+import { Upload, Download, RefreshCw, X } from "lucide-react";
 
 function buildFullName(p) {
   const first = (p?.firstName || "").trim();
@@ -91,6 +93,24 @@ function formatDobForHeader(p) {
   return formatDateDMY(d);
 }
 
+function pickMedplumPatientId(p) {
+  const candidates = [
+    p?.medplumPatientId,
+    p?.medplumId,
+    p?.medplumPatient,
+    p?.fhirId,
+    p?.fhirPatientId,
+    p?.resourceId,
+    p?.id,
+  ];
+
+  for (const c of candidates) {
+    const v = String(c || "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
 function CollapsibleBlock({ title, subtitle = "", defaultOpen = false, children }) {
   const rid = useId();
   const panelId = `pd_panel_${String(rid).replace(/:/g, "")}`;
@@ -128,10 +148,11 @@ export default function PatientDetailsPage({
   onUpdatePatient,
   handleSelectPatient,
   handleSaveTranscription,
-  handleAddReport,
   handleDeleteReport,
   handleExportPatients,
   handleImportPatients,
+  handleSaveReportEntry,
+  handleSyncPatientToMedplum,
 }) {
   const navigate = useNavigate();
   const params = useParams();
@@ -195,7 +216,8 @@ export default function PatientDetailsPage({
   };
 
   const handleImportChange = (e) => {
-    if (typeof handleImportPatients === "function") handleImportPatients(e);
+    const file = e?.target?.files?.[0] || null;
+    if (typeof handleImportPatients === "function") handleImportPatients(file);
     if (e?.target) e.target.value = "";
   };
 
@@ -219,32 +241,16 @@ export default function PatientDetailsPage({
 
     if (!text && !audioId) return;
 
-    const entry = {
-      id: crypto?.randomUUID?.() ?? `h_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      type: "transcription",
-      date: new Date(createdAt).toISOString(),
-      title: "Treatment transcription",
-      summary: text,
-      audioId: audioId || null,
-      audioUrl: "",
-      audioData: null,
-    };
-
-    const nextHistory = [entry, ...(Array.isArray(editablePatient.history) ? editablePatient.history : [])];
-
-    updateHistory(nextHistory);
-
     handleSelectPatient?.(patientId);
     if (typeof handleSaveTranscription === "function") {
       handleSaveTranscription(patientId, text, audioId || null);
     }
   };
 
-  const onAddReportLocal = (meta) => {
+  const handleClickSyncPatient = () => {
     const patientId = editablePatient?.idNumber;
     if (!patientId) return;
-    handleSelectPatient?.(patientId);
-    handleAddReport?.(patientId, meta);
+    if (typeof handleSyncPatientToMedplum === "function") handleSyncPatientToMedplum(patientId);
   };
 
   if (!editablePatient) {
@@ -253,7 +259,7 @@ export default function PatientDetailsPage({
         <div className="patient-card">
           <h2 className="section-title">Patient profile</h2>
           <div className="empty-state">Patient not found.</div>
-          <button type="button" className="header-chip-btn" onClick={() => navigate("/patients")}>
+          <button type="button" className="patients-toolbar-button" onClick={() => navigate("/patients")}>
             Back to patients list
           </button>
         </div>
@@ -275,15 +281,16 @@ export default function PatientDetailsPage({
   const selectedCount = selectedHistoryEntries.length;
   const historySubtitle = `${selectedCount} selected • ${historyCount} entries`;
 
-  const reportsSubtitle = `${selectedCount} selected • ${Array.isArray(editablePatient.reports) ? editablePatient.reports.length : 0} uploaded`;
+  const reportsUploadedCount = Array.isArray(editablePatient.reports) ? editablePatient.reports.length : 0;
+  const reportsSubtitle = `${selectedCount} selected • ${reportsUploadedCount} uploaded`;
+
+  const medplumPatientId = pickMedplumPatientId(editablePatient);
 
   return (
     <div className="patient-details-page">
       <div className={headerClass}>
         <div className="patient-header-left">
-          <div className={`patient-avatar-details ${getGenderClass(editablePatient)}`}>
-            {buildInitials(editablePatient)}
-          </div>
+          <div className={`patient-avatar-details ${getGenderClass(editablePatient)}`}>{buildInitials(editablePatient)}</div>
 
           <div className="patient-header-title-block">
             <h1 className="patient-details-name">{buildFullName(editablePatient)}</h1>
@@ -309,18 +316,34 @@ export default function PatientDetailsPage({
           </div>
         </div>
 
-        <div className="patient-header-actions">
-          <button type="button" className="header-chip-btn header-chip-close" onClick={handleClose}>
-            Close
+        <div className="patients-page-header-actions">
+          <button type="button" className="patients-toolbar-button" onClick={handleClose}>
+            <span className="patients-toolbar-button-icon">
+              <X size={16} />
+            </span>
+            <span>Close</span>
           </button>
 
-          <button type="button" className="header-chip-btn" onClick={handleExportClick}>
-            Export patient (FHIR JSON)
+          <button type="button" className="patients-toolbar-button" onClick={handleClickSyncPatient}>
+            <span className="patients-toolbar-button-icon">
+              <RefreshCw size={16} />
+            </span>
+            <span>Sync Patient</span>
           </button>
 
-          <label className="header-chip-btn header-chip-import">
-            <span>Import patient</span>
-            <input type="file" accept="application/json" className="header-import-input" onChange={handleImportChange} />
+          <button type="button" className="patients-toolbar-button" onClick={handleExportClick}>
+            <span className="patients-toolbar-button-icon">
+              <Download size={16} />
+            </span>
+            <span>Export JSON</span>
+          </button>
+
+          <label className="patients-toolbar-button" style={{ cursor: "pointer" }}>
+            <span className="patients-toolbar-button-icon">
+              <Upload size={16} />
+            </span>
+            <span>Import</span>
+            <input type="file" accept="application/json" style={{ display: "none" }} onChange={handleImportChange} />
           </label>
         </div>
       </div>
@@ -341,12 +364,7 @@ export default function PatientDetailsPage({
 
             <div className="details-row-inline">
               <span className="details-label">Email</span>
-              <InlineEditable
-                value={editablePatient.email || ""}
-                placeholder="Add email"
-                onChange={(val) => updateField("email", val)}
-                className="details-value"
-              />
+              <InlineEditable value={editablePatient.email || ""} placeholder="Add email" onChange={(val) => updateField("email", val)} className="details-value" />
             </div>
 
             <div className="details-row-inline">
@@ -362,11 +380,7 @@ export default function PatientDetailsPage({
 
           <div className="status-row">
             <span className="details-label">Clinical status</span>
-            <select
-              className="inline-input status-select"
-              value={editablePatient.clinicalStatus || ""}
-              onChange={(e) => updateField("clinicalStatus", e.target.value)}
-            >
+            <select className="inline-input status-select" value={editablePatient.clinicalStatus || ""} onChange={(e) => updateField("clinicalStatus", e.target.value)}>
               <option value="">Not Active</option>
               <option value="Active">Active</option>
               <option value="Stable">Stable</option>
@@ -386,13 +400,7 @@ export default function PatientDetailsPage({
         </CollapsibleBlock>
 
         <CollapsibleBlock title="History" subtitle={historySubtitle} defaultOpen={false}>
-          <PatientHistory
-            patient={editablePatient}
-            history={editablePatient.history || []}
-            onChangeHistory={updateHistory}
-            selectedIds={selectedHistoryIds}
-            onToggleSelected={toggleHistorySelected}
-          />
+          <PatientHistory patient={editablePatient} history={editablePatient.history || []} onChangeHistory={updateHistory} selectedIds={selectedHistoryIds} onToggleSelected={toggleHistorySelected} />
         </CollapsibleBlock>
 
         <CollapsibleBlock title="Reports" subtitle={reportsSubtitle} defaultOpen={false}>
@@ -400,13 +408,27 @@ export default function PatientDetailsPage({
             patient={editablePatient}
             patientId={editablePatient.idNumber}
             existingReports={editablePatient.reports || []}
-            onAddReport={onAddReportLocal}
             onDeleteReport={handleDeleteReport}
             selectedEntries={selectedHistoryEntries}
             onClearSelected={clearSelectedHistory}
+            totalHistoryCount={historyCount}
+            medplumPatientId={medplumPatientId}
             onSaveReportEntry={(entry) => {
+              const patientId = editablePatient?.idNumber;
+              if (!patientId) return;
+
+              handleSelectPatient?.(patientId);
+
+              if (typeof handleSaveReportEntry === "function") {
+                handleSaveReportEntry(patientId, entry);
+                return;
+              }
+
               const current = Array.isArray(editablePatient.history) ? editablePatient.history : [];
-              updateHistory([entry, ...current]);
+              const existingIndex = current.findIndex((x) => String(x?.id || "") === String(entry?.id || ""));
+              const next =
+                existingIndex >= 0 ? current.map((x, idx) => (idx === existingIndex ? entry : x)) : [entry, ...current];
+              updateHistory(next);
             }}
           />
         </CollapsibleBlock>

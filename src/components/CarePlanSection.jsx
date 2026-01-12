@@ -3,10 +3,7 @@ import "./CarePlanSection.css";
 import CarePlanGoals from "./CarePlanGoals";
 import CarePlanExercises from "./CarePlanExercises";
 import { formatDateTimeDMY } from "../utils/dateFormat";
-import {
-  toFhirCarePlanBundle,
-  downloadJson as downloadFhirJson,
-} from "../utils/fhirCarePlan";
+import { toFhirCarePlanBundle, downloadJson as downloadFhirJson } from "../utils/fhirCarePlan";
 
 function createId(prefix) {
   const id = globalThis.crypto?.randomUUID?.();
@@ -14,9 +11,7 @@ function createId(prefix) {
 }
 
 function downloadJsonInternal(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json",
-  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -71,7 +66,34 @@ function normalizeImportedCarePlan(obj) {
   };
 }
 
-export default function CarePlanSection({ patient, onUpdatePatient }) {
+function buildCarePlanDescription(draft) {
+  const goalsCount = Array.isArray(draft?.goals) ? draft.goals.length : 0;
+  const exercisesCount = Array.isArray(draft?.exercises) ? draft.exercises.length : 0;
+
+  const goalsPreview = Array.isArray(draft?.goals)
+    ? draft.goals
+        .slice(0, 3)
+        .map((g) => String(g?.title || "").trim())
+        .filter(Boolean)
+        .join("; ")
+    : "";
+
+  const exPreview = Array.isArray(draft?.exercises)
+    ? draft.exercises
+        .slice(0, 3)
+        .map((x) => String(x?.name || "").trim())
+        .filter(Boolean)
+        .join("; ")
+    : "";
+
+  const parts = [`Goals: ${goalsCount}`, `Exercises: ${exercisesCount}`];
+  if (goalsPreview) parts.push(`Goal preview: ${goalsPreview}`);
+  if (exPreview) parts.push(`Exercise preview: ${exPreview}`);
+
+  return parts.join(" | ");
+}
+
+export default function CarePlanSection({ patient, onUpdatePatient, onSaveCarePlanEntry }) {
   const fileRef = useRef(null);
   const draft = patient?.carePlanDraft || null;
 
@@ -154,21 +176,64 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
   }
 
   function onGoalsChange(nextGoals) {
-    updateDraft({
-      ...(draft || createDraft()),
+    const next = {
+      ...(draft || {
+        id: createId("cp"),
+        title: "Care plan",
+        updatedAt: new Date().toISOString(),
+        goals: [],
+        exercises: [],
+      }),
       goals: nextGoals,
       exercises: draft?.exercises || [],
       updatedAt: new Date().toISOString(),
-    });
+    };
+    updateDraft(next);
   }
 
   function onExercisesChange(nextExercises) {
-    updateDraft({
-      ...(draft || createDraft()),
+    const next = {
+      ...(draft || {
+        id: createId("cp"),
+        title: "Care plan",
+        updatedAt: new Date().toISOString(),
+        goals: [],
+        exercises: [],
+      }),
       goals: draft?.goals || [],
       exercises: nextExercises,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    updateDraft(next);
+  }
+
+  function handleSaveCarePlan() {
+    if (!draft) return;
+    const patientId = patient?.idNumber || "";
+    if (!patientId) {
+      alert("Missing patient ID.");
+      return;
+    }
+
+    const entry = {
+      id: draft.id || createId("cp"),
+      title: String(draft.title || "Care plan"),
+      name: String(draft.title || "Care plan"),
+      description: buildCarePlanDescription(draft),
+      status: "active",
+      intent: "plan",
+      createdAt: draft.updatedAt || new Date().toISOString(),
+      date: draft.updatedAt || new Date().toISOString(),
+      draft: draft,
+    };
+
+    if (typeof onSaveCarePlanEntry === "function") {
+      onSaveCarePlanEntry(patientId, entry);
+      alert("Care plan saved to patient history.");
+      return;
+    }
+
+    alert("Save is not connected.");
   }
 
   return (
@@ -176,12 +241,12 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
       <div className="careplan-actions">
         {draft ? (
           <>
+            <button type="button" className="header-chip-btn" onClick={handleSaveCarePlan}>
+              Save
+            </button>
+
             <div className="export-dropdown" ref={exportRef}>
-              <button
-                type="button"
-                className="header-chip-btn"
-                onClick={() => setExportOpen((v) => !v)}
-              >
+              <button type="button" className="header-chip-btn" onClick={() => setExportOpen((v) => !v)}>
                 Export ▾
               </button>
 
@@ -223,11 +288,7 @@ export default function CarePlanSection({ patient, onUpdatePatient }) {
               />
             </label>
 
-            <button
-              type="button"
-              className="header-chip-btn careplan-danger"
-              onClick={clearDraft}
-            >
+            <button type="button" className="header-chip-btn careplan-danger" onClick={clearDraft}>
               Delete draft
             </button>
           </>
