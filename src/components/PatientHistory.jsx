@@ -8,9 +8,7 @@ function normalizeEntries(history) {
 }
 
 function createEntry() {
-  const id =
-    crypto?.randomUUID?.() ??
-    `h_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const id = crypto?.randomUUID?.() ?? `h_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   return {
     id,
@@ -45,8 +43,7 @@ function getTypeClass(type) {
   if (t === "transcription") return "history-type-pill transcription";
   if (t === "session") return "history-type-pill session";
   if (t === "note") return "history-type-pill note";
-  if (t === "careplan" || t === "care plan")
-    return "history-type-pill careplan";
+  if (t === "careplan" || t === "care plan") return "history-type-pill careplan";
   if (t === "report") return "history-type-pill report";
   return "history-type-pill other";
 }
@@ -77,9 +74,7 @@ function entrySignature(entry) {
 
 function dedupeHistory(entries) {
   const arr = normalizeEntries(entries);
-  const sorted = [...arr].sort(
-    (a, b) => new Date(b?.date || 0) - new Date(a?.date || 0)
-  );
+  const sorted = [...arr].sort((a, b) => new Date(b?.date || 0) - new Date(a?.date || 0));
 
   const seenById = new Set();
   const seenBySig = new Set();
@@ -124,6 +119,19 @@ function IconTrash(props) {
   );
 }
 
+function isPlayableUrl(value) {
+  const s = String(value || "").trim();
+  if (!s) return false;
+  return s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:") || s.startsWith("blob:");
+}
+
+function asAudioIdMaybe(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  if (isPlayableUrl(s)) return "";
+  return s;
+}
+
 function AudioFromId({ audioId }) {
   const [src, setSrc] = useState("");
   const [error, setError] = useState("");
@@ -157,24 +165,13 @@ function AudioFromId({ audioId }) {
     };
   }, [audioId]);
 
-  if (error)
-    return (
-      <div className="history-summary history-summary-audio-only">
-        {error}
-      </div>
-    );
+  if (error) return <div className="history-summary history-summary-audio-only">{error}</div>;
   if (!src) return null;
 
   return <audio controls preload="metadata" src={src} />;
 }
 
-export default function PatientHistory({
-  patient,
-  history,
-  onChangeHistory,
-  selectedIds,
-  onToggleSelected,
-}) {
+export default function PatientHistory({ patient, history, onChangeHistory, selectedIds, onToggleSelected }) {
   const [filterType, setFilterType] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -199,9 +196,7 @@ export default function PatientHistory({
     let entries = allEntries;
 
     if (filterType !== "all") {
-      entries = entries.filter(
-        (entry) => normalizeType(entry?.type) === normalizeType(filterType)
-      );
+      entries = entries.filter((entry) => normalizeType(entry?.type) === normalizeType(filterType));
     }
 
     const term = searchText.trim().toLowerCase();
@@ -213,9 +208,7 @@ export default function PatientHistory({
       });
     }
 
-    return [...entries].sort(
-      (a, b) => new Date(b?.date || 0) - new Date(a?.date || 0)
-    );
+    return [...entries].sort((a, b) => new Date(b?.date || 0) - new Date(a?.date || 0));
   }, [allEntries, filterType, searchText]);
 
   const emitChange = (next) => {
@@ -278,34 +271,13 @@ export default function PatientHistory({
     if (typeof onToggleSelected === "function") onToggleSelected(entryId);
   };
 
-  const circleCheckboxStyle = (checked) => ({
-    width: 18,
-    height: 18,
-    borderRadius: 999,
-    border: "1.5px solid rgba(145, 130, 255, 0.6)",
-    background: checked ? "#111" : "transparent",
-    boxShadow: checked ? "inset 0 0 0 5px rgba(255,255,255,0.92)" : "none",
-    display: "inline-block",
-    verticalAlign: "middle",
-    cursor: "pointer",
-    appearance: "none",
-    WebkitAppearance: "none",
-    outline: "none",
-    marginInlineEnd: 10,
-    flexShrink: 0,
-  });
-
   return (
     <div className="patient-history-card">
       <div className="patient-history-header">
         <h3 className="patient-history-title">Patient history</h3>
 
         <div className="patient-history-filters">
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="history-filter-select"
-          >
+          <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="history-filter-select">
             <option value="all">All types</option>
             <option value="transcription">Transcriptions</option>
             <option value="session">Sessions</option>
@@ -325,11 +297,7 @@ export default function PatientHistory({
             />
           </div>
 
-          <button
-            type="button"
-            className="history-add-button"
-            onClick={handleAdd}
-          >
+          <button type="button" className="history-add-button" onClick={handleAdd}>
             Add entry
           </button>
         </div>
@@ -349,21 +317,15 @@ export default function PatientHistory({
           const audioData = entry?.audioData || "";
           const audioId = entry?.audioId || "";
 
-          const audioSrc =
-            typeof audioUrl === "string" && audioUrl.startsWith("blob:")
-              ? ""
-              : audioUrl || audioData || "";
+          const directUrl = isPlayableUrl(audioUrl) ? String(audioUrl) : isPlayableUrl(audioData) ? String(audioData) : "";
+          const effectiveAudioId = String(audioId || "").trim() || asAudioIdMaybe(audioData);
 
           const checked = isSelected(entry?.id);
 
           return (
             <li
               key={entry?.id}
-              className={`history-item ${
-                normalizeType(entry?.type) === "transcription"
-                  ? "history-item-transcription"
-                  : ""
-              }`}
+              className={`history-item ${normalizeType(entry?.type) === "transcription" ? "history-item-transcription" : ""}`}
             >
               <div className="history-item-top">
                 <div className="history-meta-row">
@@ -372,12 +334,10 @@ export default function PatientHistory({
                     checked={checked}
                     onChange={() => toggleSelected(entry?.id)}
                     aria-label="Select visit"
-                    style={circleCheckboxStyle(checked)}
+                    className="history-select-circle"
                   />
 
-                  <span className={getTypeClass(entry?.type)}>
-                    {formatType(entry?.type)}
-                  </span>
+                  <span className={getTypeClass(entry?.type)}>{formatType(entry?.type)}</span>
                   <span className="history-meta-separator">•</span>
                   <span className="history-meta-date" dir="ltr">
                     {formatDateDMY(entry?.date)}
@@ -409,18 +369,10 @@ export default function PatientHistory({
                     </>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className="history-pill-btn primary"
-                        onClick={handleSaveEdit}
-                      >
+                      <button type="button" className="history-pill-btn primary" onClick={handleSaveEdit}>
                         Save
                       </button>
-                      <button
-                        type="button"
-                        className="history-pill-btn"
-                        onClick={handleCancelEdit}
-                      >
+                      <button type="button" className="history-pill-btn" onClick={handleCancelEdit}>
                         Cancel
                       </button>
                     </>
@@ -430,160 +382,98 @@ export default function PatientHistory({
 
               {!isEditing ? (
                 <>
-                  <div className="history-title-line">
-                    {entry?.title || "(No title)"}
-                  </div>
+                  <div className="history-title-line">{entry?.title || "(No title)"}</div>
 
                   {entry?.summary && (
-                    <div
-                      className={`history-summary ${
-                        normalizeType(entry?.type) === "transcription"
-                          ? "history-summary-transcription"
-                          : ""
-                      }`}
-                    >
+                    <div className={`history-summary ${normalizeType(entry?.type) === "transcription" ? "history-summary-transcription" : ""}`}>
                       {entry.summary}
                     </div>
                   )}
 
-                  {audioSrc && (
+                  {directUrl ? (
                     <div className="history-audio">
-                      <audio
-                        controls
-                        preload="metadata"
-                        src={audioSrc}
-                      />
+                      <audio controls preload="metadata" src={directUrl} />
                       {!entry?.summary && (
                         <div className="history-summary history-summary-audio-only">
                           Audio-only visit (no text transcription).
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {!audioSrc && audioId && (
+                  ) : effectiveAudioId ? (
                     <div className="history-audio">
-                      <AudioFromId audioId={audioId} />
+                      <AudioFromId audioId={effectiveAudioId} />
                       {!entry?.summary && (
                         <div className="history-summary history-summary-audio-only">
                           Audio-only visit (no text transcription).
                         </div>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </>
               ) : (
                 <div className="history-edit-form">
                   <div className="history-edit-row">
-                    <label className="history-edit-label">
-                      Type
-                    </label>
+                    <label className="history-edit-label">Type</label>
                     <select
                       className="history-edit-input"
                       value={draft?.type || "note"}
-                      onChange={(e) =>
-                        handleDraftChange("type", e.target.value)
-                      }
+                      onChange={(e) => handleDraftChange("type", e.target.value)}
                     >
-                      <option value="transcription">
-                        Transcription
-                      </option>
+                      <option value="transcription">Transcription</option>
                       <option value="session">Session</option>
                       <option value="note">Note</option>
-                      <option value="careplan">
-                        CarePlan
-                      </option>
-                      <option value="report">
-                        Report
-                      </option>
+                      <option value="careplan">CarePlan</option>
+                      <option value="report">Report</option>
                     </select>
                   </div>
 
                   <div className="history-edit-row">
-                    <label className="history-edit-label">
-                      Date
-                    </label>
+                    <label className="history-edit-label">Date</label>
                     <input
                       className="history-edit-input"
                       type="date"
-                      value={
-                        draft?.dateInput ||
-                        toISODateInput(new Date())
-                      }
-                      onChange={(e) =>
-                        handleDraftChange(
-                          "dateInput",
-                          e.target.value
-                        )
-                      }
+                      value={draft?.dateInput || toISODateInput(new Date())}
+                      onChange={(e) => handleDraftChange("dateInput", e.target.value)}
                     />
                   </div>
 
                   <div className="history-edit-row">
-                    <label className="history-edit-label">
-                      Title
-                    </label>
+                    <label className="history-edit-label">Title</label>
                     <input
                       className="history-edit-input"
                       value={draft?.title || ""}
-                      onChange={(e) =>
-                        handleDraftChange(
-                          "title",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleDraftChange("title", e.target.value)}
                       placeholder="Title"
                     />
                   </div>
 
                   <div className="history-edit-row">
-                    <label className="history-edit-label">
-                      Summary
-                    </label>
+                    <label className="history-edit-label">Summary</label>
                     <textarea
                       className="history-edit-textarea"
                       value={draft?.summary || ""}
-                      onChange={(e) =>
-                        handleDraftChange(
-                          "summary",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleDraftChange("summary", e.target.value)}
                       placeholder="Summary"
                       rows={3}
                     />
                   </div>
 
                   <div className="history-edit-row">
-                    <label className="history-edit-label">
-                      Audio URL
-                    </label>
+                    <label className="history-edit-label">Audio URL</label>
                     <input
                       className="history-edit-input"
                       value={draft?.audioUrl || ""}
-                      onChange={(e) =>
-                        handleDraftChange(
-                          "audioUrl",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleDraftChange("audioUrl", e.target.value)}
                       placeholder="https://..."
                     />
                   </div>
 
                   <div className="history-edit-row">
-                    <label className="history-edit-label">
-                      Audio ID
-                    </label>
+                    <label className="history-edit-label">Audio ID</label>
                     <input
                       className="history-edit-input"
                       value={draft?.audioId || ""}
-                      onChange={(e) =>
-                        handleDraftChange(
-                          "audioId",
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => handleDraftChange("audioId", e.target.value)}
                       placeholder="IndexedDB audio id"
                     />
                   </div>

@@ -273,7 +273,11 @@ function cleanUpdate(obj) {
       continue;
     }
 
-    if ((key === "history" || key === "reports" || key === "carePlans") && Array.isArray(value) && value.length === 0) {
+    if (
+      (key === "history" || key === "reports" || key === "carePlans") &&
+      Array.isArray(value) &&
+      value.length === 0
+    ) {
       continue;
     }
 
@@ -339,6 +343,28 @@ async function ensureMedplumPatient(patient) {
   } catch {
     return null;
   }
+}
+
+function extractAudioAttachment(audioData) {
+  if (!audioData) return null;
+
+  const value = String(audioData);
+
+  if (value.startsWith("data:")) {
+    const parts = value.split(",");
+    if (parts.length < 2) return null;
+
+    const meta = parts[0];
+    const base64 = parts[1];
+    if (!base64) return null;
+
+    const metaAfterPrefix = meta.split(":")[1] || "";
+    const contentType = metaAfterPrefix.split(";")[0] || "audio/webm";
+
+    return { contentType, data: base64 };
+  }
+
+  return { contentType: "audio/webm", data: value };
 }
 
 function carePlanItemToCarePlan(patient, carePlanItem) {
@@ -419,7 +445,6 @@ export function usePatients() {
         try {
           await idbSet(KV_PATIENTS, safe);
         } catch {
-          // ignore
         } finally {
           safeWriteLocalBackup(safe);
         }
@@ -436,7 +461,8 @@ export function usePatients() {
     });
   };
 
-  const patientIdExists = (idNumber) => patients.some((p) => trimId(p.idNumber) === trimId(idNumber));
+  const patientIdExists = (idNumber) =>
+    patients.some((p) => trimId(p.idNumber) === trimId(idNumber));
 
   async function syncOnePatientToMedplum(patient) {
     if (!hasMedplumSession()) throw new Error("No Medplum session");
@@ -464,6 +490,25 @@ export function usePatients() {
       ];
 
       await createIfMissing("Observation", APP_IDENTIFIER_SYSTEM, dedupeKey, baseObservation);
+
+      if (item?.audioData) {
+        const attachment = extractAudioAttachment(item.audioData);
+        if (attachment?.data) {
+          const mediaKey = `${idNumber}:media:${itemId}`;
+          const media = {
+            resourceType: "Media",
+            status: "completed",
+            subject: { reference: subjectRef },
+            createdDateTime: item?.date || new Date().toISOString(),
+            identifier: [{ system: APP_IDENTIFIER_SYSTEM, value: mediaKey }],
+            content: {
+              contentType: attachment.contentType || "audio/webm",
+              data: attachment.data,
+            },
+          };
+          await createIfMissing("Media", APP_IDENTIFIER_SYSTEM, mediaKey, media);
+        }
+      }
     }
 
     const reports = ensureArray(patient.reports);
@@ -485,7 +530,9 @@ export function usePatients() {
     const carePlans = ensureArray(patient.carePlans);
     for (let c = 0; c < carePlans.length; c++) {
       const cp = carePlans[c];
-      const cpId = cp?.id || `${cp?.createdAt || cp?.date || ""}-${cp?.title || cp?.name || ""}-${cp?.description || ""}`;
+      const cpId =
+        cp?.id ||
+        `${cp?.createdAt || cp?.date || ""}-${cp?.title || cp?.name || ""}-${cp?.description || ""}`;
       const dedupeKey = `${idNumber}:careplan:${cpId}`;
 
       const carePlan = carePlanItemToCarePlan({ ...patient, medplumId }, { ...cp, id: cpId });
@@ -540,13 +587,20 @@ export function usePatients() {
         updatePatientsWithSave((prev) =>
           prev.map((p) =>
             trimId(p.idNumber) === idNumber
-              ? { ...p, medplumId, medplumSyncedAt: new Date().toISOString(), medplumSyncStatus: "ok" }
+              ? {
+                  ...p,
+                  medplumId,
+                  medplumSyncedAt: new Date().toISOString(),
+                  medplumSyncStatus: "ok",
+                }
               : p
           )
         );
       } catch {
         updatePatientsWithSave((prev) =>
-          prev.map((p) => (trimId(p.idNumber) === idNumber ? { ...p, medplumSyncStatus: "error" } : p))
+          prev.map((p) =>
+            trimId(p.idNumber) === idNumber ? { ...p, medplumSyncStatus: "error" } : p
+          )
         );
       }
     }
@@ -557,7 +611,9 @@ export function usePatients() {
 
     const newIdNumber = trimId(updatedPatient.idNumber);
     const oldIdNumber =
-      trimId(updatedPatient._originalIdNumber) || trimId(editingPatient?.idNumber) || newIdNumber;
+      trimId(updatedPatient._originalIdNumber) ||
+      trimId(editingPatient?.idNumber) ||
+      newIdNumber;
 
     if (!newIdNumber && !oldIdNumber) {
       alert("ID number is required.");
@@ -666,7 +722,10 @@ export function usePatients() {
         const json = JSON.parse(raw);
 
         const isFhirBundle =
-          json && typeof json === "object" && json.resourceType === "Bundle" && Array.isArray(json.entry);
+          json &&
+          typeof json === "object" &&
+          json.resourceType === "Bundle" &&
+          Array.isArray(json.entry);
 
         if (!isFhirBundle) {
           const arr = Array.isArray(json)
@@ -700,7 +759,9 @@ export function usePatients() {
 
         const patientResources = resources.filter((res) => res.resourceType === "Patient");
         const observationResources = resources.filter((res) => res.resourceType === "Observation");
-        const diagnosticResources = resources.filter((res) => res.resourceType === "DiagnosticReport");
+        const diagnosticResources = resources.filter(
+          (res) => res.resourceType === "DiagnosticReport"
+        );
         const carePlanResources = resources.filter((res) => res.resourceType === "CarePlan");
 
         const importedPatients = patientResources.map(fromFhirPatient).map(normalizePatientPreserve);
@@ -825,7 +886,7 @@ export function usePatients() {
       if (!medplumId) return;
 
       const subjectRef = `Patient/${medplumId}`;
-      const dedupeKey = `${trimmedId}:history:${newHistoryItemRef.id}`;
+      const historyKey = `${trimmedId}:history:${newHistoryItemRef.id}`;
 
       const observation = {
         resourceType: "Observation",
@@ -834,10 +895,29 @@ export function usePatients() {
         effectiveDateTime: now,
         code: { text: newHistoryItemRef.title || "Treatment transcription" },
         note: cleanText ? [{ text: cleanText }] : [],
-        identifier: [{ system: APP_IDENTIFIER_SYSTEM, value: dedupeKey }],
+        identifier: [{ system: APP_IDENTIFIER_SYSTEM, value: historyKey }],
       };
 
-      await createIfMissing("Observation", APP_IDENTIFIER_SYSTEM, dedupeKey, observation);
+      await createIfMissing("Observation", APP_IDENTIFIER_SYSTEM, historyKey, observation);
+
+      if (cleanAudio) {
+        const attachment = extractAudioAttachment(cleanAudio);
+        if (attachment?.data) {
+          const mediaKey = `${trimmedId}:media:${newHistoryItemRef.id}`;
+          const media = {
+            resourceType: "Media",
+            status: "completed",
+            subject: { reference: subjectRef },
+            createdDateTime: now,
+            identifier: [{ system: APP_IDENTIFIER_SYSTEM, value: mediaKey }],
+            content: {
+              contentType: attachment.contentType || "audio/webm",
+              data: attachment.data,
+            },
+          };
+          await createIfMissing("Media", APP_IDENTIFIER_SYSTEM, mediaKey, media);
+        }
+      }
     } catch (error) {
       console.error("[handleSaveTranscription] Medplum sync failed:", error);
     }
@@ -1016,7 +1096,12 @@ export function usePatients() {
       updatePatientsWithSave((prev) =>
         prev.map((p) =>
           trimId(p.idNumber) === pid
-            ? { ...p, medplumId, medplumSyncedAt: new Date().toISOString(), medplumSyncStatus: "ok" }
+            ? {
+                ...p,
+                medplumId,
+                medplumSyncedAt: new Date().toISOString(),
+                medplumSyncStatus: "ok",
+              }
             : p
         )
       );

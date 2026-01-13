@@ -1,4 +1,3 @@
-// src/components/RecordAudio.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./RecordAudio.css";
 import { saveAudioBlob, deleteAudioBlob } from "../utils/audioStorage";
@@ -15,12 +14,23 @@ function improveTranscription(text) {
   return `Clinical summary: ${result.charAt(0).toUpperCase()}${result.slice(1)}`;
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read audio blob"));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
 
   const [audioId, setAudioId] = useState(null);
   const [audioURL, setAudioURL] = useState("");
+  const [audioData, setAudioData] = useState(null);
+
   const [transcription, setTranscription] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -64,6 +74,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     }
     setAudioURL("");
     setAudioId(null);
+    setAudioData(null);
     setTranscription("");
     setStatusMessage("");
   };
@@ -109,8 +120,16 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
         const url = URL.createObjectURL(blob);
         audioPreviewUrlRef.current = url;
 
+        let dataUrl = "";
+        try {
+          dataUrl = await blobToDataUrl(blob);
+        } catch {
+          dataUrl = "";
+        }
+
         setAudioId(id);
         setAudioURL(url);
+        setAudioData(dataUrl || null);
         setStatusMessage("Recording saved.");
       };
 
@@ -196,7 +215,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     if (!selectedPatient || typeof onSaveTranscription !== "function") return;
 
     const text = (transcription || "").trim();
-    const hasAudio = Boolean(audioId);
+    const hasAudio = Boolean(audioId) || Boolean(audioData);
 
     if (!text && !hasAudio) {
       alert("Nothing to save. Please record audio or add transcription text.");
@@ -206,14 +225,13 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     const payload = {
       text,
       audioId: audioId || null,
+      audioData: audioData || null,
       patientId: patientKey,
       createdAt: Date.now(),
     };
 
     try {
-      if (onSaveTranscription.length <= 1) onSaveTranscription(payload);
-      else onSaveTranscription(patientKey, text, audioId || null);
-
+      onSaveTranscription(payload);
       resetDraftUIOnly();
       setStatusMessage("Saved to patient history.");
     } catch (error) {
@@ -286,7 +304,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
             type="button"
             className="record-footer-btn record-clear-btn"
             onClick={handleClear}
-            disabled={!transcription && !audioId}
+            disabled={!transcription && !audioId && !audioData}
           >
             Clear
           </button>
