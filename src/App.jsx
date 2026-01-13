@@ -1,4 +1,3 @@
-// src/App.jsx
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { usePatients } from "./hooks/usePatients";
@@ -27,6 +26,8 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function initAuth() {
       try {
         const params = new URLSearchParams(window.location.search);
@@ -39,30 +40,30 @@ function App() {
         }
 
         const isAuthenticated = medplum.isAuthenticated();
-        if (isAuthenticated) {
-          try {
-            const profile = medplum.getProfile();
-            setMedplumProfile(profile || null);
-          } catch (error) {
-            if (import.meta.env.DEV) {
-              console.warn("Failed to get Medplum profile:", error);
-            }
-            setMedplumProfile(null);
-          }
-        } else {
-          setMedplumProfile(null);
+        if (!isAuthenticated) {
+          if (!cancelled) setMedplumProfile(null);
+          return;
+        }
+
+        try {
+          const profile = medplum.getProfile();
+          if (!cancelled) setMedplumProfile(profile || { ok: true });
+        } catch {
+          if (!cancelled) setMedplumProfile({ ok: true });
         }
       } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error("Medplum authentication failed:", error);
-        }
-        setMedplumProfile(null);
+        if (import.meta.env.DEV) console.error("Medplum auth init failed:", error);
+        if (!cancelled) setMedplumProfile(null);
       } finally {
-        setAuthReady(true);
+        if (!cancelled) setAuthReady(true);
       }
     }
 
     initAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleConnectMedplum = async () => {
@@ -77,9 +78,7 @@ function App() {
         medplum.signInWithRedirect();
       }
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Failed to connect/disconnect Medplum:", error);
-      }
+      if (import.meta.env.DEV) console.error("Connect/disconnect failed:", error);
       alert("Failed to connect to Medplum. Please try again.");
     }
   };
@@ -147,20 +146,14 @@ function App() {
               }
             />
 
-            <Route
-              path="/data/treatment"
-              element={<SimplePage title="Treatment data" text="Analyze treatment records. (Coming soon)" />}
-            />
+            <Route path="/data/treatment" element={<SimplePage title="Treatment data" text="Analyze treatment records. (Coming soon)" />} />
 
             <Route
               path="/data/care-plan"
               element={<CarePlansPage patients={patientsState.patients} onUpdatePatient={patientsState.handleUpdatePatientInline} />}
             />
 
-            <Route
-              path="/data/appointment"
-              element={<SimplePage title="Appointments data" text="Appointment data view. (Coming soon)" />}
-            />
+            <Route path="/data/appointment" element={<SimplePage title="Appointments data" text="Appointment data view. (Coming soon)" />} />
 
             <Route path="/analytics" element={<SimplePage title="Analytics" text="Dashboards and reports. (Coming soon)" />} />
 
