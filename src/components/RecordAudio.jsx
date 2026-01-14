@@ -1,3 +1,4 @@
+// src/components/RecordAudio.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./RecordAudio.css";
 import { saveAudioBlob, deleteAudioBlob } from "../utils/audioStorage";
@@ -7,30 +8,42 @@ function pickMimeType() {
   return types.find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
 }
 
-function improveTranscription(text) {
+function improveTranscriptionLocal(text) {
   if (!text) return "";
   let result = text.trim().replace(/\s+/g, " ");
   if (!/[.!?]$/.test(result)) result += ".";
   return `Clinical summary: ${result.charAt(0).toUpperCase()}${result.slice(1)}`;
 }
 
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to read audio blob"));
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.readAsDataURL(blob);
+async function improveTranscriptionViaServer(text, { signal } = {}) {
+  const res = await fetch("http://localhost:3001/api/ai/improve-visit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+    signal,
   });
+
+  if (!res.ok) {
+    let extra = "";
+    try {
+      extra = await res.text();
+    } catch {}
+    throw new Error(`Improve API failed (${res.status})${extra ? `: ${extra}` : ""}`);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  const out = data?.text ?? data?.improvedText ?? data?.result;
+  if (typeof out !== "string" || !out.trim()) throw new Error("Improve API returned empty text");
+  return out.trim();
 }
 
 export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const [isRecording, setIsRecording] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
 
   const [audioId, setAudioId] = useState(null);
   const [audioURL, setAudioURL] = useState("");
-  const [audioData, setAudioData] = useState(null);
-
   const [transcription, setTranscription] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -38,6 +51,9 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
   const audioChunksRef = useRef([]);
   const recognitionRef = useRef(null);
   const audioPreviewUrlRef = useRef("");
+  const dictationWantedRef = useRef(false);
+
+  const improveAbortRef = useRef(null);
 
   const canUseSpeechRecognition =
     typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -54,6 +70,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
         mediaRecorderRef.current?.stream?.getTracks?.().forEach((t) => t.stop());
       } catch {}
       try {
+        dictationWantedRef.current = false;
         recognitionRef.current?.stop();
       } catch {}
       if (audioPreviewUrlRef.current) {
@@ -62,6 +79,9 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
         } catch {}
         audioPreviewUrlRef.current = "";
       }
+      try {
+        improveAbortRef.current?.abort?.();
+      } catch {}
     };
   }, []);
 
@@ -74,13 +94,13 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     }
     setAudioURL("");
     setAudioId(null);
-    setAudioData(null);
     setTranscription("");
     setStatusMessage("");
   };
 
   const stopDictationIfRunning = () => {
     if (!isDictating) return;
+    dictationWantedRef.current = false;
     try {
       recognitionRef.current?.stop();
     } catch {}
@@ -120,16 +140,8 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
         const url = URL.createObjectURL(blob);
         audioPreviewUrlRef.current = url;
 
-        let dataUrl = "";
-        try {
-          dataUrl = await blobToDataUrl(blob);
-        } catch {
-          dataUrl = "";
-        }
-
         setAudioId(id);
         setAudioURL(url);
-        setAudioData(dataUrl || null);
         setStatusMessage("Recording saved.");
       };
 
@@ -158,6 +170,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     if (!canUseSpeechRecognition || !selectedPatient) return;
 
     if (isDictating) {
+      dictationWantedRef.current = false;
       try {
         recognitionRef.current?.stop();
       } catch {}
@@ -184,23 +197,71 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
+      console.error("SpeechRecognition error:", event?.error, event);
+      dictationWantedRef.current = false;
       setIsDictating(false);
-      setStatusMessage("Dictation error.");
+      setStatusMessage(`Dictation error${event?.error ? `: ${event.error}` : "."}`);
     };
 
-    recognition.onend = () => setIsDictating(false);
+    recognition.onend = () => {
+      if (dictationWantedRef.current) {
+        try {
+          recognition.start();
+          return;
+        } catch (e) {
+          console.error("SpeechRecognition restart failed:", e);
+          dictationWantedRef.current = false;
+        }
+      }
+      setIsDictating(false);
+    };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsDictating(true);
-    setStatusMessage("Dictation in progress...");
+    dictationWantedRef.current = true;
+
+    try {
+      recognition.start();
+      setIsDictating(true);
+      setStatusMessage("Dictation in progress...");
+    } catch (e) {
+      console.error("SpeechRecognition start failed:", e);
+      dictationWantedRef.current = false;
+      setIsDictating(false);
+      setStatusMessage("Dictation error.");
+    }
   };
 
-  const handleImprove = () => {
+  const handleImprove = async () => {
     const t = (transcription || "").trim();
-    if (!t) return;
-    setTranscription(improveTranscription(t));
+    if (!t || isImproving) return;
+
+    setIsImproving(true);
+    setStatusMessage("Improving transcription...");
+
+    try {
+      try {
+        improveAbortRef.current?.abort?.();
+      } catch {}
+      const controller = new AbortController();
+      improveAbortRef.current = controller;
+
+      let improvedText = "";
+      try {
+        improvedText = await improveTranscriptionViaServer(t, { signal: controller.signal });
+      } catch (err) {
+        console.warn("Improve via server failed, using local fallback:", err);
+        improvedText = improveTranscriptionLocal(t);
+      }
+
+      setTranscription(improvedText);
+      setStatusMessage("Transcription improved.");
+    } catch (error) {
+      console.error("Improve failed:", error);
+      setStatusMessage("Improve failed.");
+    } finally {
+      setIsImproving(false);
+    }
   };
 
   const handleClear = async () => {
@@ -215,7 +276,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     if (!selectedPatient || typeof onSaveTranscription !== "function") return;
 
     const text = (transcription || "").trim();
-    const hasAudio = Boolean(audioId) || Boolean(audioData);
+    const hasAudio = Boolean(audioId);
 
     if (!text && !hasAudio) {
       alert("Nothing to save. Please record audio or add transcription text.");
@@ -225,13 +286,14 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
     const payload = {
       text,
       audioId: audioId || null,
-      audioData: audioData || null,
       patientId: patientKey,
       createdAt: Date.now(),
     };
 
     try {
-      onSaveTranscription(payload);
+      if (onSaveTranscription.length <= 1) onSaveTranscription(payload);
+      else onSaveTranscription(patientKey, text, audioId || null);
+
       resetDraftUIOnly();
       setStatusMessage("Saved to patient history.");
     } catch (error) {
@@ -241,7 +303,9 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
   };
 
   const patientLabel = selectedPatient
-    ? `${selectedPatient.firstName || ""} ${selectedPatient.lastName || ""} (ID ${selectedPatient.idNumber || ""})`
+    ? `${selectedPatient.firstName || ""} ${selectedPatient.lastName || ""} (ID ${
+        selectedPatient.idNumber || ""
+      })`
     : "No patient selected";
 
   return (
@@ -295,7 +359,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
             type="button"
             className="record-footer-btn record-ai-btn"
             onClick={handleImprove}
-            disabled={!transcription.trim()}
+            disabled={!transcription.trim() || isImproving}
           >
             Improve with AI
           </button>
@@ -304,7 +368,7 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
             type="button"
             className="record-footer-btn record-clear-btn"
             onClick={handleClear}
-            disabled={!transcription && !audioId && !audioData}
+            disabled={!transcription && !audioId}
           >
             Clear
           </button>
