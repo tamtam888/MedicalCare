@@ -5,6 +5,7 @@ import DashboardPage from "./pages/DashboardPage";
 import PatientsPage from "./pages/PatientsPage";
 import PatientDetailsPage from "./pages/PatientDetailsPage";
 import CarePlansPage from "./pages/CarePlansPage";
+import CalendarTreatmentsPage from "./pages/CalendarTreatmentsPage";
 import { medplum } from "./medplumClient";
 import Sidebar from "./components/Sidebar";
 import "./App.css";
@@ -46,7 +47,8 @@ function App() {
         }
 
         try {
-          const profile = medplum.getProfile();
+          // Prefer async profile fetch when possible
+          const profile = medplum.getProfileAsync ? await medplum.getProfileAsync() : medplum.getProfile();
           if (!cancelled) setMedplumProfile(profile || { ok: true });
         } catch {
           if (!cancelled) setMedplumProfile({ ok: true });
@@ -146,6 +148,9 @@ function App() {
                 />
               }
             />
+
+            {/* NEW: Calendar route */}
+            <Route path="/calendar" element={<CalendarTreatmentsPage />} />
 
             <Route path="/data/treatment" element={<SimplePage title="Treatment data" text="Analyze treatment records. (Coming soon)" />} />
 

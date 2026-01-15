@@ -1,0 +1,37 @@
+.calendar-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.calendar-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calendar-page-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.calendar-page-subtitle {
+  margin: 0;
+  opacity: 0.75;
+}
+
+.calendar-page-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px;
+  min-height: 520px;
+}
+
+.calendar-page-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  opacity: 0.7;
+}
