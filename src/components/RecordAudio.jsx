@@ -124,10 +124,20 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
       };
 
       recorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
         audioChunksRef.current = [];
 
-        const id = crypto?.randomUUID?.() ?? `a_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        if (!blob || blob.size < 1024) {
+          console.error("Recorded blob is empty/small:", blob?.size, blob?.type);
+          setStatusMessage("Recording failed (empty audio). Try again.");
+          return;
+        }
+
+        const id =
+          crypto?.randomUUID?.() ?? `a_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
         await saveAudioBlob(id, blob);
 
         if (audioPreviewUrlRef.current) {
@@ -142,11 +152,14 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
 
         setAudioId(id);
         setAudioURL(url);
-        setStatusMessage("Recording saved.");
+        setStatusMessage(`Recording saved. (${Math.round(blob.size / 1024)} KB)`);
       };
 
       mediaRecorderRef.current = recorder;
+
+      // Start without timeslice to keep WebM duration metadata stable
       recorder.start();
+
       setIsRecording(true);
       setStatusMessage("Recording in progress...");
     } catch (error) {
@@ -157,13 +170,28 @@ export default function RecordAudio({ selectedPatient, onSaveTranscription }) {
   };
 
   const handleStopRecording = () => {
-    if (!mediaRecorderRef.current) return;
+    const rec = mediaRecorderRef.current;
+    if (!rec) return;
+
     try {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
-    } catch {}
-    mediaRecorderRef.current = null;
-    setIsRecording(false);
+      try {
+        rec.requestData();
+      } catch {}
+
+      setTimeout(() => {
+        try {
+          rec.stop();
+        } catch {}
+        try {
+          rec.stream.getTracks().forEach((t) => t.stop());
+        } catch {}
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+      }, 200);
+    } catch {
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+    }
   };
 
   const handleToggleDictation = () => {

@@ -142,6 +142,7 @@ function App() {
                   handleImportPatients={patientsState.handleImportPatients}
                   handleSaveReportEntry={patientsState.handleSaveReportEntry}
                   handleSyncPatientToMedplum={patientsState.handleSyncPatientToMedplum}
+                  handleSaveCarePlanEntry={patientsState.handleSaveCarePlanEntry}
                 />
               }
             />

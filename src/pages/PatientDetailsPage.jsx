@@ -153,6 +153,7 @@ export default function PatientDetailsPage({
   handleImportPatients,
   handleSaveReportEntry,
   handleSyncPatientToMedplum,
+  handleSaveCarePlanEntry,
 }) {
   const navigate = useNavigate();
   const params = useParams();
@@ -396,7 +397,7 @@ export default function PatientDetailsPage({
         </CollapsibleBlock>
 
         <CollapsibleBlock title="Care plan" subtitle="Goals and exercises" defaultOpen={false}>
-          <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} />
+          <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} onSaveCarePlanEntry={handleSaveCarePlanEntry} />
         </CollapsibleBlock>
 
         <CollapsibleBlock title="History" subtitle={historySubtitle} defaultOpen={false}>
