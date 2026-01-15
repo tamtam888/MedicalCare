@@ -1,3 +1,4 @@
+// src/hooks/usePatients.js 
 import { useEffect, useRef, useState } from "react";
 import {
   ensureArray,
@@ -11,6 +12,7 @@ import {
   ID_SYSTEM,
 } from "../utils/fhirPatient.js";
 import { medplum } from "../medplumClient";
+import { loadAudioBlob } from "../utils/audioStorage";
 
 const STORAGE_KEY = "patients";
 
@@ -273,11 +275,7 @@ function cleanUpdate(obj) {
       continue;
     }
 
-    if (
-      (key === "history" || key === "reports" || key === "carePlans") &&
-      Array.isArray(value) &&
-      value.length === 0
-    ) {
+    if ((key === "history" || key === "reports" || key === "carePlans") && Array.isArray(value) && value.length === 0) {
       continue;
     }
 
@@ -345,26 +343,55 @@ async function ensureMedplumPatient(patient) {
   }
 }
 
-function extractAudioAttachment(audioData) {
+function extractAudioAttachmentFromDataUrl(audioData) {
   if (!audioData) return null;
 
   const value = String(audioData);
+  if (!value.startsWith("data:")) return null;
 
-  if (value.startsWith("data:")) {
-    const parts = value.split(",");
-    if (parts.length < 2) return null;
+  const parts = value.split(",");
+  if (parts.length < 2) return null;
 
-    const meta = parts[0];
-    const base64 = parts[1];
-    if (!base64) return null;
+  const meta = parts[0];
+  const base64 = parts[1];
+  if (!base64) return null;
 
-    const metaAfterPrefix = meta.split(":")[1] || "";
-    const contentType = metaAfterPrefix.split(";")[0] || "audio/webm";
+  const metaAfterPrefix = meta.split(":")[1] || "";
+  const contentType = metaAfterPrefix.split(";")[0] || "audio/webm";
 
-    return { contentType, data: base64 };
+  return { contentType, data: base64 };
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("FileReader failed"));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function resolveAudioAttachment(audioValue) {
+  if (!audioValue) return null;
+
+  const direct = extractAudioAttachmentFromDataUrl(audioValue);
+  if (direct?.data) return direct;
+
+  const idCandidate = String(audioValue || "").trim();
+  if (!idCandidate) return null;
+
+  try {
+    const blob = await loadAudioBlob(idCandidate);
+    if (!blob) return null;
+
+    const dataUrl = await blobToDataUrl(blob);
+    const fromDataUrl = extractAudioAttachmentFromDataUrl(dataUrl);
+    if (fromDataUrl?.data) return fromDataUrl;
+
+    return null;
+  } catch {
+    return null;
   }
-
-  return { contentType: "audio/webm", data: value };
 }
 
 function carePlanItemToCarePlan(patient, carePlanItem) {
@@ -385,6 +412,79 @@ function carePlanItemToCarePlan(patient, carePlanItem) {
     title,
     description,
   };
+}
+
+function base64ToUint8Array(base64) {
+  const cleaned = String(base64 || "").replace(/\s/g, "");
+  if (!cleaned) return new Uint8Array();
+  const binaryString = atob(cleaned);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function upsertPlayableMedia(subjectRef, mediaKey, contentType, base64Data, createdDateTime) {
+  const existing = await findByIdentifier("Media", APP_IDENTIFIER_SYSTEM, mediaKey);
+  const ct = contentType || "audio/webm";
+  const safeData = String(base64Data || "").trim();
+
+  if (existing?.id && existing?.content?.url && !String(existing.content.url).startsWith("data:")) {
+    return existing;
+  }
+
+  if (!safeData) {
+    return existing || null;
+  }
+
+  const baseMedia = {
+    ...(existing?.id ? existing : { resourceType: "Media" }),
+    status: "completed",
+    subject: { reference: subjectRef },
+    createdDateTime: createdDateTime || new Date().toISOString(),
+    identifier: [
+      ...(Array.isArray(existing?.identifier) ? existing.identifier : []),
+      ...(existing?.identifier?.some?.((i) => i?.system === APP_IDENTIFIER_SYSTEM && i?.value === mediaKey)
+        ? []
+        : [{ system: APP_IDENTIFIER_SYSTEM, value: mediaKey }]),
+    ],
+  };
+
+  const savedMedia = existing?.id
+    ? await medplum.updateResource({ ...baseMedia, id: existing.id })
+    : await medplum.createResource(baseMedia);
+
+  const bytes = base64ToUint8Array(safeData);
+  if (!bytes || bytes.length === 0) {
+    return savedMedia;
+  }
+
+  const blob = new Blob([bytes], { type: ct });
+
+  const binary = await medplum.createBinary(
+    {
+      data: blob,
+      contentType: ct,
+      filename: "audio.webm",
+    },
+    {
+      headers: {
+        "X-Security-Context": `Media/${savedMedia.id}`,
+      },
+    }
+  );
+
+  const nextMedia = {
+    ...savedMedia,
+    content: {
+      contentType: ct,
+      url: `Binary/${binary?.id}`,
+    },
+  };
+
+  return await medplum.updateResource({ ...nextMedia, id: savedMedia.id });
 }
 
 export function usePatients() {
@@ -461,8 +561,7 @@ export function usePatients() {
     });
   };
 
-  const patientIdExists = (idNumber) =>
-    patients.some((p) => trimId(p.idNumber) === trimId(idNumber));
+  const patientIdExists = (idNumber) => patients.some((p) => trimId(p.idNumber) === trimId(idNumber));
 
   async function syncOnePatientToMedplum(patient) {
     if (!hasMedplumSession()) throw new Error("No Medplum session");
@@ -491,22 +590,20 @@ export function usePatients() {
 
       await createIfMissing("Observation", APP_IDENTIFIER_SYSTEM, dedupeKey, baseObservation);
 
-      if (item?.audioData) {
-        const attachment = extractAudioAttachment(item.audioData);
-        if (attachment?.data) {
-          const mediaKey = `${idNumber}:media:${itemId}`;
-          const media = {
-            resourceType: "Media",
-            status: "completed",
-            subject: { reference: subjectRef },
-            createdDateTime: item?.date || new Date().toISOString(),
-            identifier: [{ system: APP_IDENTIFIER_SYSTEM, value: mediaKey }],
-            content: {
-              contentType: attachment.contentType || "audio/webm",
-              data: attachment.data,
-            },
-          };
-          await createIfMissing("Media", APP_IDENTIFIER_SYSTEM, mediaKey, media);
+      const audioValue = item?.audioData || item?.audioId || "";
+      const attachment = await resolveAudioAttachment(audioValue);
+      if (attachment?.data) {
+        const mediaKey = `${idNumber}:media:${itemId}`;
+        try {
+          await upsertPlayableMedia(
+            subjectRef,
+            mediaKey,
+            attachment.contentType || "audio/webm",
+            attachment.data,
+            item?.date || new Date().toISOString()
+          );
+        } catch (e) {
+          console.error("[syncOnePatientToMedplum] Media upload failed:", e);
         }
       }
     }
@@ -611,9 +708,7 @@ export function usePatients() {
 
     const newIdNumber = trimId(updatedPatient.idNumber);
     const oldIdNumber =
-      trimId(updatedPatient._originalIdNumber) ||
-      trimId(editingPatient?.idNumber) ||
-      newIdNumber;
+      trimId(updatedPatient._originalIdNumber) || trimId(editingPatient?.idNumber) || newIdNumber;
 
     if (!newIdNumber && !oldIdNumber) {
       alert("ID number is required.");
@@ -675,7 +770,6 @@ export function usePatients() {
   const handleEditPatient = (idNumber) => {
     const patient =
       typeof idNumber === "object" && idNumber !== null ? idNumber : findPatientById(idNumber);
-
     if (!patient) return;
 
     setEditingPatient(patient);
@@ -722,10 +816,7 @@ export function usePatients() {
         const json = JSON.parse(raw);
 
         const isFhirBundle =
-          json &&
-          typeof json === "object" &&
-          json.resourceType === "Bundle" &&
-          Array.isArray(json.entry);
+          json && typeof json === "object" && json.resourceType === "Bundle" && Array.isArray(json.entry);
 
         if (!isFhirBundle) {
           const arr = Array.isArray(json)
@@ -759,9 +850,7 @@ export function usePatients() {
 
         const patientResources = resources.filter((res) => res.resourceType === "Patient");
         const observationResources = resources.filter((res) => res.resourceType === "Observation");
-        const diagnosticResources = resources.filter(
-          (res) => res.resourceType === "DiagnosticReport"
-        );
+        const diagnosticResources = resources.filter((res) => res.resourceType === "DiagnosticReport");
         const carePlanResources = resources.filter((res) => res.resourceType === "CarePlan");
 
         const importedPatients = patientResources.map(fromFhirPatient).map(normalizePatientPreserve);
@@ -900,22 +989,13 @@ export function usePatients() {
 
       await createIfMissing("Observation", APP_IDENTIFIER_SYSTEM, historyKey, observation);
 
-      if (cleanAudio) {
-        const attachment = extractAudioAttachment(cleanAudio);
-        if (attachment?.data) {
-          const mediaKey = `${trimmedId}:media:${newHistoryItemRef.id}`;
-          const media = {
-            resourceType: "Media",
-            status: "completed",
-            subject: { reference: subjectRef },
-            createdDateTime: now,
-            identifier: [{ system: APP_IDENTIFIER_SYSTEM, value: mediaKey }],
-            content: {
-              contentType: attachment.contentType || "audio/webm",
-              data: attachment.data,
-            },
-          };
-          await createIfMissing("Media", APP_IDENTIFIER_SYSTEM, mediaKey, media);
+      const attachment = await resolveAudioAttachment(cleanAudio);
+      if (attachment?.data) {
+        const mediaKey = `${trimmedId}:media:${newHistoryItemRef.id}`;
+        try {
+          await upsertPlayableMedia(subjectRef, mediaKey, attachment.contentType || "audio/webm", attachment.data, now);
+        } catch (e) {
+          console.error("[handleSaveTranscription] Media upload failed:", e);
         }
       }
     } catch (error) {
@@ -933,12 +1013,14 @@ export function usePatients() {
       id: reportEntry?.id || safeUuid(),
       name: reportEntry?.name || "Report",
       type: reportEntry?.type || "report",
-      description: reportEntry?.description || "",
+      description: reportEntry?.description || reportEntry?.summary || "",
       uploadedAt: reportEntry?.uploadedAt || reportEntry?.date || now,
       date: reportEntry?.date || reportEntry?.uploadedAt || now,
       pdfUrl: reportEntry?.pdfUrl || reportEntry?.url || "",
       ...reportEntry,
     };
+
+    const repDescription = String(rep.description || "").trim();
 
     let updatedPatientRef = null;
 
@@ -956,7 +1038,7 @@ export function usePatients() {
               type: "report",
               title: rep.name || "Report",
               date: rep.uploadedAt || now,
-              summary: rep.description || "Report saved to patient.",
+              summary: repDescription || "Report saved to patient.",
               audioData: null,
             },
           ],

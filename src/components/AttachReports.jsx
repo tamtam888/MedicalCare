@@ -14,7 +14,6 @@ function AttachReports({
   onSaveReportEntry,
   totalHistoryCount,
 }) {
-  const [uploadError, setUploadError] = useState("");
   const [aiError, setAiError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -22,7 +21,6 @@ function AttachReports({
   const [reportText, setReportText] = useState("");
   const [kpi, setKpi] = useState(null);
 
-  const reports = Array.isArray(existingReports) ? existingReports : [];
   const selected = Array.isArray(selectedEntries) ? selectedEntries : [];
   const selectedCount = selected.length;
 
@@ -40,7 +38,6 @@ function AttachReports({
     setReportText("");
     setKpi(null);
     setAiError("");
-    setUploadError("");
   };
 
   const clearReportOnly = () => {
@@ -259,6 +256,39 @@ function AttachReports({
     return lines;
   };
 
+  function drawBarChart(page, opts) {
+    const {
+      x,
+      y,
+      width,
+      height,
+      value,
+      max,
+      labelLeft,
+      labelRight,
+      font,
+      labelSize = 9,
+      valueSize = 9,
+    } = opts;
+
+    const safeMax = Number.isFinite(Number(max)) && Number(max) > 0 ? Number(max) : 1;
+    const safeVal = Number.isFinite(Number(value)) ? Math.max(0, Math.min(Number(value), safeMax)) : 0;
+    const ratio = safeVal / safeMax;
+
+    page.drawText(String(labelLeft || ""), { x, y: y + height + 4, size: labelSize, font });
+    if (labelRight) {
+      const t = String(labelRight);
+      const tw = font.widthOfTextAtSize(t, labelSize);
+      page.drawText(t, { x: x + width - tw, y: y + height + 4, size: labelSize, font });
+    }
+
+    page.drawRectangle({ x, y, width, height, borderWidth: 1 });
+    page.drawRectangle({ x, y, width: Math.max(0, width * ratio), height });
+
+    const valueText = `${safeVal} / ${safeMax}`;
+    page.drawText(valueText, { x, y: y - 12, size: valueSize, font });
+  }
+
   const handleDownloadPdf = async () => {
     const content = String(reportText || "").trim();
     if (!content) return;
@@ -327,7 +357,49 @@ function AttachReports({
         y = drawLine(line, y, 10);
       }
 
-      y -= 10;
+      const ss = Number.isFinite(Number(kpi?.sessionsSelected)) ? Number(kpi.sessionsSelected) : null;
+      const st = Number.isFinite(Number(kpi?.sessionsTotal)) ? Number(kpi.sessionsTotal) : null;
+
+      const fps = Number.isFinite(Number(kpi?.functionalProgressScore)) ? Number(kpi.functionalProgressScore) : null;
+
+      const chartWidth = Math.min(340, maxWidth);
+      const chartHeight = 12;
+
+      if (ss !== null && st !== null) {
+        y = ensureSpace(y);
+        y -= 10;
+        drawBarChart(page, {
+          x: marginX,
+          y: y - chartHeight,
+          width: chartWidth,
+          height: chartHeight,
+          value: ss,
+          max: st,
+          labelLeft: "Sessions completion",
+          labelRight: "",
+          font,
+        });
+        y -= 28;
+      }
+
+      if (fps !== null) {
+        y = ensureSpace(y);
+        y -= 10;
+        drawBarChart(page, {
+          x: marginX,
+          y: y - chartHeight,
+          width: chartWidth,
+          height: chartHeight,
+          value: fps,
+          max: 10,
+          labelLeft: "Functional progress",
+          labelRight: "0–10",
+          font,
+        });
+        y -= 28;
+      }
+
+      y -= 4;
     }
 
     y = ensureSpace(y);
@@ -404,43 +476,6 @@ function AttachReports({
     clearAll();
   };
 
-  const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      setUploadError("Only PDF files are allowed.");
-      return;
-    }
-
-    setUploadError("");
-
-    const reportMeta = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
-    };
-
-    if (typeof onAddReport === "function") {
-      onAddReport(patientId, reportMeta);
-    }
-
-    event.target.value = "";
-  };
-
-  const handleDownload = () => {
-    alert("Download is not implemented yet in this MVP.");
-  };
-
-  const handleDelete = (reportId) => {
-    if (typeof onDeleteReport === "function") {
-      onDeleteReport(patientId, reportId);
-      return;
-    }
-    alert("Delete is not implemented yet in this MVP.");
-  };
-
   return (
     <div className="reports-surface">
       <div className="reports-top">
@@ -450,11 +485,6 @@ function AttachReports({
             <button type="button" className="reports-pill" onClick={fillPatientDetailsLocal}>
               Fill Patient Details
             </button>
-
-            <label className="reports-pill reports-upload">
-              <span>Upload PDF</span>
-              <input type="file" accept="application/pdf" onChange={handleFileChange} />
-            </label>
           </div>
         </div>
       </div>
@@ -507,50 +537,11 @@ function AttachReports({
         </button>
       </div>
 
-      {(uploadError || aiError) && (
+      {aiError && (
         <div className="reports-errors">
-          {uploadError ? <div className="reports-error">{uploadError}</div> : null}
-          {aiError ? <div className="reports-error">{aiError}</div> : null}
+          <div className="reports-error">{aiError}</div>
         </div>
       )}
-
-      <div className="reports-uploaded">
-        <div className="reports-kicker">Uploaded reports</div>
-
-        {reports.length === 0 ? (
-          <div className="reports-empty">No reports uploaded yet</div>
-        ) : (
-          <ul className="reports-list">
-            {reports.map((report) => (
-              <li key={report.id} className="reports-item">
-                <div className="reports-item-left">
-                  <span className="reports-icon">📄</span>
-                  <div className="reports-item-info">
-                    <div className="reports-item-name">{report.name}</div>
-                    <div className="reports-item-meta">
-                      {Math.round(report.size / 1024)} KB ·{" "}
-                      {report.uploadedAt ? new Date(report.uploadedAt).toLocaleDateString() : ""}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="reports-item-actions">
-                  <button type="button" className="reports-small" onClick={() => handleDownload(report)}>
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    className="reports-small reports-small-danger"
-                    onClick={() => handleDelete(report.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }
