@@ -1,37 +1,251 @@
-.calendar-page {
+/* Page layout */
+.mc-calendar-page {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+
+.mc-calendar-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
 }
 
-.calendar-page-header {
+.mc-calendar-title-wrap {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+.mc-calendar-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.mc-calendar-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(17, 24, 39, 0.6);
+}
+
+.mc-calendar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Top right: bell */
+.mc-icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(17, 24, 39, 0.82);
+}
+
+.mc-icon-button:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+  background: rgba(255, 255, 255, 1);
+}
+
+/* + Add: purple outline like your UI */
+.mc-calendar-add {
+  padding: 0.45rem 0.95rem;
+  border-radius: 12px;
+  border: 2px solid rgba(168, 85, 247, 0.55);
+  background-color: rgba(255, 255, 255, 0.95);
+  color: rgba(17, 24, 39, 0.9);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.mc-calendar-add:hover {
+  border-color: rgba(99, 102, 241, 0.55);
+  background-color: rgba(255, 255, 255, 1);
+}
+
+.mc-calendar-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.mc-calendar-shell {
+  padding: 12px;
+}
+
+/* ========== FullCalendar theming ========== */
+/* Keep the grid clean & clinical */
+.fc {
+  --fc-border-color: rgba(0, 0, 0, 0.08);
+  --fc-today-bg-color: rgba(168, 85, 247, 0.06);
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: rgba(0, 0, 0, 0.03);
+  --fc-list-event-hover-bg-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Title style */
+.fc .fc-toolbar-title {
+  font-size: 16px;
+  font-weight: 750;
+  color: rgba(17, 24, 39, 0.92);
+}
+
+/* Toolbar spacing */
+.fc .fc-toolbar {
+  gap: 10px;
+}
+
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Buttons: make everything match your purple rounded UI --- */
+.fc .fc-button-group {
   gap: 6px;
 }
 
-.calendar-page-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0;
+/* Base button */
+.fc .fc-button {
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-weight: 650;
+  font-size: 0.85rem;
+  border: 1.5px solid rgba(168, 85, 247, 0.35);
+  background-color: rgba(168, 85, 247, 0.08);
+  color: rgba(88, 28, 135, 0.96);
+  box-shadow: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.08s ease;
 }
 
-.calendar-page-subtitle {
-  margin: 0;
-  opacity: 0.75;
+.fc .fc-button:hover {
+  background-color: rgba(168, 85, 247, 0.14);
+  border-color: rgba(168, 85, 247, 0.55);
+  color: rgba(88, 28, 135, 1);
 }
 
-.calendar-page-card {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 16px;
-  background: #fff;
-  padding: 16px;
-  min-height: 520px;
+.fc .fc-button:active {
+  transform: translateY(0.5px);
 }
 
-.calendar-page-empty {
-  height: 100%;
-  display: grid;
-  place-items: center;
-  opacity: 0.7;
+/* Active (selected) view button */
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background-color: rgba(168, 85, 247, 0.88);
+  border-color: rgba(168, 85, 247, 0.88);
+  color: #ffffff;
+  font-weight: 750;
+}
+
+/* Disabled */
+.fc .fc-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Focus accessibility */
+.fc .fc-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.22);
+}
+
+/* navLinks (clickable day headers) */
+.fc a {
+  color: rgba(17, 24, 39, 0.82);
+  text-decoration: none;
+}
+
+.fc a:hover {
+  color: rgba(88, 28, 135, 0.98);
+  text-decoration: underline;
+}
+
+/* ========== Events (Google-like readability) ========== */
+/* Base event: readable, black text, mild tint */
+.mc-event {
+  border-radius: 6px;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.14);
+  color: #111827;
+  font-weight: 750;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+/* Ensure inner event text stays black */
+.mc-event .fc-event-title,
+.mc-event .fc-event-time {
+  color: #111827;
+  font-weight: 750;
+}
+
+/* Active vs past */
+.mc-event--active {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(99, 102, 241, 0.26);
+}
+
+.mc-event--past {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.14);
+  opacity: 0.66;
+}
+
+/* Pending sync (optional) */
+.mc-event--pending {
+  outline: 2px dashed rgba(0, 0, 0, 0.18);
+  outline-offset: 2px;
+}
+
+/* Therapist colors (6 calm variants) */
+.mc-event--t0 {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(99, 102, 241, 0.26);
+}
+.mc-event--t1 {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.22);
+}
+.mc-event--t2 {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.22);
+}
+.mc-event--t3 {
+  background: rgba(168, 85, 247, 0.14);
+  border-color: rgba(168, 85, 247, 0.22);
+}
+.mc-event--t4 {
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.2);
+}
+.mc-event--t5 {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.18);
+}
+
+@media (max-width: 768px) {
+  .mc-calendar-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mc-calendar-shell {
+    padding: 10px;
+  }
 }

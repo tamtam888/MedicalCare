@@ -72,3 +72,23 @@ export function autoFormatDMY(input) {
   if (digits.length <= 4) return `${dd}/${mm}`;
   return `${dd}/${mm}/${yyyy}`;
 }
+export function toISODateTimeLocalInput(value) {
+  const d = parseFlexibleDate(value);
+  if (!d) return "";
+
+  const yyyy = d.getFullYear();
+  const mm = pad2(d.getMonth() + 1);
+  const dd = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const min = pad2(d.getMinutes());
+
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+export function fromISODateTimeLocalInput(value) {
+  const s = String(value || "").trim();
+  if (!s) return new Date().toISOString();
+
+  const d = new Date(s);
+  return isDate(d) ? d.toISOString() : new Date().toISOString();
+}

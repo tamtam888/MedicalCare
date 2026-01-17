@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./PatientHistory.css";
 import { loadAudioBlob } from "../utils/audioStorage";
 import { formatDateDMY, toISODateInput, fromISODateInput } from "../utils/dateFormat";
+import { capitalizeSentences } from "../utils/textFormatters";
 
 function normalizeEntries(history) {
   return Array.isArray(history) ? history : [];
@@ -249,6 +250,8 @@ export default function PatientHistory({ patient, history, onChangeHistory, sele
       ...draft,
       type: normalizeType(draft.type),
       date: fromISODateInput(draft.dateInput),
+      title: capitalizeSentences(draft.title || ""),
+      summary: capitalizeSentences(draft.summary || ""),
     };
     delete updatedEntry.dateInput;
 
@@ -260,6 +263,14 @@ export default function PatientHistory({ patient, history, onChangeHistory, sele
 
   const handleDraftChange = (key, value) => {
     setDraft((prev) => ({ ...(prev || {}), [key]: value }));
+  };
+
+  const handleDraftBlurCapitalize = (key) => {
+    setDraft((prev) => {
+      const next = { ...(prev || {}) };
+      next[key] = capitalizeSentences(next[key] || "");
+      return next;
+    });
   };
 
   const isSelected = (entryId) => {
@@ -317,7 +328,11 @@ export default function PatientHistory({ patient, history, onChangeHistory, sele
           const audioData = entry?.audioData || "";
           const audioId = entry?.audioId || "";
 
-          const directUrl = isPlayableUrl(audioUrl) ? String(audioUrl) : isPlayableUrl(audioData) ? String(audioData) : "";
+          const directUrl = isPlayableUrl(audioUrl)
+            ? String(audioUrl)
+            : isPlayableUrl(audioData)
+              ? String(audioData)
+              : "";
           const effectiveAudioId = String(audioId || "").trim() || asAudioIdMaybe(audioData);
 
           const checked = isSelected(entry?.id);
@@ -385,7 +400,9 @@ export default function PatientHistory({ patient, history, onChangeHistory, sele
                   <div className="history-title-line">{entry?.title || "(No title)"}</div>
 
                   {entry?.summary && (
-                    <div className={`history-summary ${normalizeType(entry?.type) === "transcription" ? "history-summary-transcription" : ""}`}>
+                    <div
+                      className={`history-summary ${normalizeType(entry?.type) === "transcription" ? "history-summary-transcription" : ""}`}
+                    >
                       {entry.summary}
                     </div>
                   )}
@@ -443,6 +460,7 @@ export default function PatientHistory({ patient, history, onChangeHistory, sele
                       className="history-edit-input"
                       value={draft?.title || ""}
                       onChange={(e) => handleDraftChange("title", e.target.value)}
+                      onBlur={() => handleDraftBlurCapitalize("title")}
                       placeholder="Title"
                     />
                   </div>
@@ -453,6 +471,7 @@ export default function PatientHistory({ patient, history, onChangeHistory, sele
                       className="history-edit-textarea"
                       value={draft?.summary || ""}
                       onChange={(e) => handleDraftChange("summary", e.target.value)}
+                      onBlur={() => handleDraftBlurCapitalize("summary")}
                       placeholder="Summary"
                       rows={3}
                     />

@@ -40,15 +40,13 @@ function App() {
           window.history.replaceState({}, "", cleanUrl);
         }
 
-        const isAuthenticated = medplum.isAuthenticated();
-        if (!isAuthenticated) {
+        if (!medplum.isAuthenticated()) {
           if (!cancelled) setMedplumProfile(null);
           return;
         }
 
         try {
-          // Prefer async profile fetch when possible
-          const profile = medplum.getProfileAsync ? await medplum.getProfileAsync() : medplum.getProfile();
+          const profile = medplum.getProfile();
           if (!cancelled) setMedplumProfile(profile || { ok: true });
         } catch {
           if (!cancelled) setMedplumProfile({ ok: true });
@@ -99,6 +97,7 @@ function App() {
             <button type="button" className="header-icon-button" title="Settings">
               ⚙️
             </button>
+
             <button type="button" className="primary-button medplum-header-button" onClick={handleConnectMedplum}>
               {medplumProfile ? "Medplum: Connected" : "Connect to Medplum"}
             </button>
@@ -108,7 +107,6 @@ function App() {
         <main className="app-main">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
             <Route path="/dashboard" element={<DashboardPage patients={patients} />} />
 
             <Route
@@ -149,29 +147,32 @@ function App() {
               }
             />
 
-            {/* NEW: Calendar route */}
-            <Route path="/calendar" element={<CalendarTreatmentsPage />} />
-
-            <Route path="/data/treatment" element={<SimplePage title="Treatment data" text="Analyze treatment records. (Coming soon)" />} />
+            <Route path="/data/treatment" element={<SimplePage title="Treatment data" text="Analyze treatment records." />} />
 
             <Route
               path="/data/care-plan"
               element={<CarePlansPage patients={patientsState.patients} onUpdatePatient={patientsState.handleUpdatePatientInline} />}
             />
 
-            <Route path="/data/appointment" element={<SimplePage title="Appointments data" text="Appointment data view. (Coming soon)" />} />
+            <Route
+              path="/data/appointment"
+              element={<CalendarTreatmentsPage medplumProfile={medplumProfile} patients={patientsState.patients} />}
+            />
 
-            <Route path="/analytics" element={<SimplePage title="Analytics" text="Dashboards and reports. (Coming soon)" />} />
-
-            <Route path="/security" element={<SimplePage title="Security" text="Security and permissions. (Coming soon)" />} />
-
-            <Route path="/api" element={<SimplePage title="API" text="API configuration. (Coming soon)" />} />
-
-            <Route path="/settings" element={<SimplePage title="Settings" text="Application settings. (Coming soon)" />} />
+            <Route path="/analytics" element={<SimplePage title="Analytics" text="Dashboards and reports." />} />
+            <Route path="/security" element={<SimplePage title="Security" text="Security and permissions." />} />
+            <Route path="/api" element={<SimplePage title="API" text="API configuration." />} />
+            <Route path="/settings" element={<SimplePage title="Settings" text="Application settings." />} />
 
             <Route path="*" element={<Navigate to="/patients" replace />} />
           </Routes>
         </main>
+
+        <footer className="app-footer" aria-label="App footer">
+          <span className="app-footer-text">© 2026 MedicalCare. All rights reserved.</span>
+          <span className="app-footer-sep">•</span>
+          <span className="app-footer-text">by TK</span>
+        </footer>
       </div>
     </div>
   );
