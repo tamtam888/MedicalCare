@@ -112,8 +112,12 @@ export default function AppointmentDrawer({
   onSave,
   onDelete,
   loading,
+  isAdmin = false,
+  currentTherapistId = "",
+  therapistOptions = [],
 }) {
   const list = Array.isArray(patients) ? patients : [];
+  const safeTherapists = Array.isArray(therapistOptions) ? therapistOptions : [];
 
   const form = useForm({
     resolver: zodResolver(appointmentInputSchema),
@@ -144,6 +148,7 @@ export default function AppointmentDrawer({
   const startValue = watch("start");
   const endValue = watch("end");
   const notesValue = watch("notes");
+  const therapistIdValue = watch("therapistId");
 
   const [query, setQuery] = useState("");
 
@@ -155,15 +160,19 @@ export default function AppointmentDrawer({
   useEffect(() => {
     if (!open) return;
 
+    const baseTherapistId = isAdmin
+      ? String(initialValues?.therapistId || "").trim()
+      : String(initialValues?.therapistId || currentTherapistId || "").trim();
+
     reset({
       patientId: initialValues?.patientId ? digitsOnly(initialValues.patientId) : "",
-      therapistId: initialValues?.therapistId || "",
+      therapistId: baseTherapistId,
       start: initialValues?.start || "",
       end: initialValues?.end || "",
       status: initialValues?.status || AppointmentStatus.scheduled,
       notes: initialValues?.notes || "",
     });
-  }, [open, initialValues, reset]);
+  }, [open, initialValues, reset, isAdmin, currentTherapistId]);
 
   useEffect(() => {
     if (!open) return;
@@ -202,6 +211,18 @@ export default function AppointmentDrawer({
     }
   }, [open, query, resolution, setValue, setError, clearErrors]);
 
+  useEffect(() => {
+    if (!open) return;
+    if (isAdmin) return;
+
+    const locked = String(currentTherapistId || "").trim();
+    if (!locked) return;
+
+    if (String(therapistIdValue || "").trim() !== locked) {
+      setValue("therapistId", locked, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [open, isAdmin, currentTherapistId, therapistIdValue, setValue]);
+
   const clearPatient = async () => {
     setQuery("");
     setValue("patientId", "", { shouldValidate: true, shouldDirty: true });
@@ -233,9 +254,19 @@ export default function AppointmentDrawer({
       return;
     }
 
+    const therapistId = isAdmin
+      ? String(values.therapistId || "").trim()
+      : String(currentTherapistId || values.therapistId || "").trim();
+
+    if (isAdmin && !therapistId) {
+      setError("therapistId", { type: "manual", message: "Therapist is required." });
+      return;
+    }
+
     await onSave({
       ...values,
       patientId: pid,
+      therapistId,
       notes: capitalizeSentences(String(values.notes || "")),
     });
   };
@@ -243,6 +274,7 @@ export default function AppointmentDrawer({
   if (!open) return null;
 
   const showLinked = Boolean(resolution.patient) && Boolean(resolution.idNumber);
+  const therapistsEmpty = safeTherapists.length === 0;
 
   return (
     <div className="mc-drawer-overlay" onMouseDown={onClose}>
@@ -305,9 +337,7 @@ export default function AppointmentDrawer({
                 type="datetime-local"
                 lang="en-GB"
                 value={toISODateTimeLocalInput(startValue)}
-                onChange={(e) =>
-                  setValue("start", fromISODateTimeLocalInput(e.target.value), { shouldValidate: true })
-                }
+                onChange={(e) => setValue("start", fromISODateTimeLocalInput(e.target.value), { shouldValidate: true })}
               />
               {errors.start && <p className="mc-error">{String(errors.start.message)}</p>}
             </div>
@@ -319,9 +349,7 @@ export default function AppointmentDrawer({
                 type="datetime-local"
                 lang="en-GB"
                 value={toISODateTimeLocalInput(endValue)}
-                onChange={(e) =>
-                  setValue("end", fromISODateTimeLocalInput(e.target.value), { shouldValidate: true })
-                }
+                onChange={(e) => setValue("end", fromISODateTimeLocalInput(e.target.value), { shouldValidate: true })}
               />
               {errors.end && <p className="mc-error">{String(errors.end.message)}</p>}
             </div>
@@ -330,7 +358,20 @@ export default function AppointmentDrawer({
           <div className="mc-grid2">
             <div className="mc-field">
               <label className="mc-label">Therapist</label>
-              <input className="mc-input" {...register("therapistId")} />
+
+              {isAdmin ? (
+                <select className="mc-input" {...register("therapistId", { required: true })} disabled={therapistsEmpty}>
+                  <option value="">{therapistsEmpty ? "No therapists available" : "Select therapist…"}</option>
+                  {safeTherapists.map((t) => (
+                    <option key={String(t.value)} value={String(t.value)}>
+                      {String(t.label)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input className="mc-input" {...register("therapistId")} disabled />
+              )}
+
               {errors.therapistId && <p className="mc-error">{String(errors.therapistId.message)}</p>}
             </div>
 
