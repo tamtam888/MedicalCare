@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useId } from "react";
+import React, { useEffect, useMemo, useState, useId, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./PatientDetailsPage.css";
 
@@ -229,28 +229,31 @@ export default function PatientDetailsPage({
     if (e?.target) e.target.value = "";
   };
 
-  const onSaveTranscriptionLocal = (payloadOrPatientId, maybeText, maybeAudioId) => {
-    const patientId = editablePatient?.idNumber;
-    if (!patientId) return;
+  const onSaveTranscriptionLocal = useCallback(
+    (payloadOrPatientId, maybeText, maybeAudioId) => {
+      const patientId = editablePatient?.idNumber;
+      if (!patientId) return;
 
-    let text = "";
-    let audioId = null;
+      let text = "";
+      let audioId = null;
 
-    if (typeof payloadOrPatientId === "object" && payloadOrPatientId) {
-      text = String(payloadOrPatientId.text || "").trim();
-      audioId = payloadOrPatientId.audioId || null;
-    } else {
-      text = String(maybeText || "").trim();
-      audioId = maybeAudioId || null;
-    }
+      if (typeof payloadOrPatientId === "object" && payloadOrPatientId) {
+        text = String(payloadOrPatientId.text || "").trim();
+        audioId = payloadOrPatientId.audioId || null;
+      } else {
+        text = String(maybeText || "").trim();
+        audioId = maybeAudioId || null;
+      }
 
-    if (!text && !audioId) return;
+      if (!text && !audioId) return;
 
-    handleSelectPatient?.(patientId);
-    if (typeof handleSaveTranscription === "function") {
-      handleSaveTranscription(patientId, text, audioId || null);
-    }
-  };
+      handleSelectPatient?.(patientId);
+      if (typeof handleSaveTranscription === "function") {
+        handleSaveTranscription(patientId, text, audioId || null);
+      }
+    },
+    [editablePatient?.idNumber, handleSelectPatient, handleSaveTranscription]
+  );
 
   const handleClickSyncPatient = () => {
     const patientId = editablePatient?.idNumber;
@@ -436,6 +439,7 @@ export default function PatientDetailsPage({
       </div>
 
       <div className="patient-sections-stack">
+        {/* 1) PatientDetails */}
         <CollapsibleBlock title="Patient details" subtitle={detailsSubtitle} defaultOpen={false}>
           <div className="patient-details-top-row">
             <div className="details-row-inline">
@@ -487,24 +491,28 @@ export default function PatientDetailsPage({
           </div>
         </CollapsibleBlock>
 
-        <CollapsibleBlock title="Appointments" subtitle="Scheduling" defaultOpen={false}>
-          <div className="patients-page-header-actions" style={{ marginBottom: 12 }}>
+        {/* 2) Appointment */}
+        <CollapsibleBlock title="Appointments" subtitle="Upcoming and past visits" defaultOpen={false}>
+          <div className="patients-page-header-actions">
             <button type="button" className="patients-toolbar-button" onClick={openAddAppointmentForPatient}>
               <span>Add appointment</span>
             </button>
           </div>
 
-          <PatientAppointments patient={editablePatient} onOpenAppointment={openEditAppointment} />
+          <PatientAppointments
+            patient={editablePatient}
+            patientFullName={buildFullName(editablePatient)}
+            isAdmin={false}
+            onOpenAppointment={openEditAppointment}
+          />
         </CollapsibleBlock>
 
+        {/* 3) TreatmentTransaction */}
         <CollapsibleBlock title="Treatment transcription" subtitle="Record and improve visit notes" defaultOpen={true}>
           <RecordAudio selectedPatient={editablePatient} onSaveTranscription={onSaveTranscriptionLocal} />
         </CollapsibleBlock>
 
-        <CollapsibleBlock title="Care plan" subtitle="Goals and exercises" defaultOpen={false}>
-          <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} onSaveCarePlanEntry={handleSaveCarePlanEntry} />
-        </CollapsibleBlock>
-
+        {/* 4) History */}
         <CollapsibleBlock title="History" subtitle={historySubtitle} defaultOpen={false}>
           <PatientHistory
             patient={editablePatient}
@@ -515,6 +523,16 @@ export default function PatientDetailsPage({
           />
         </CollapsibleBlock>
 
+        {/* 5) CarePlan */}
+        <CollapsibleBlock title="Care plan" subtitle="Goals and exercises" defaultOpen={false}>
+          <CarePlanSection
+            patient={editablePatient}
+            onUpdatePatient={updatePatient}
+            onSaveCarePlanEntry={handleSaveCarePlanEntry}
+          />
+        </CollapsibleBlock>
+
+        {/* 6) Report */}
         <CollapsibleBlock title="Reports" subtitle={reportsSubtitle} defaultOpen={false}>
           <AttachReports
             patient={editablePatient}

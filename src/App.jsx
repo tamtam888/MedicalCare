@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { get, set } from "idb-keyval";
 import { usePatients } from "./hooks/usePatients";
 import DashboardPage from "./pages/DashboardPage";
 import PatientsPage from "./pages/PatientsPage";
@@ -13,6 +14,7 @@ import Sidebar from "./components/Sidebar";
 import "./App.css";
 
 const LOGGED_IN_KEY = "mc_logged_in";
+const THERAPISTS_KEY = "mc_therapists_v1";
 
 function isLoggedIn() {
   try {
@@ -20,6 +22,62 @@ function isLoggedIn() {
   } catch {
     return false;
   }
+}
+
+function normalizeString(v) {
+  return String(v ?? "").trim();
+}
+
+function digitsOnly(v) {
+  return normalizeString(v).replace(/\D/g, "");
+}
+
+function pickTherapistName(t) {
+  const fullName = normalizeString(t?.fullName);
+  if (fullName) return fullName;
+  const name = normalizeString(t?.name);
+  if (name) return name;
+  const first = normalizeString(t?.firstName);
+  const last = normalizeString(t?.lastName);
+  return `${first} ${last}`.trim();
+}
+
+function buildPractitioner(t) {
+  const idNumber = digitsOnly(t?.idNumber || t?.id);
+  const nameText = pickTherapistName(t);
+
+  const telecom = [];
+  const phone = normalizeString(t?.phone);
+  const email = normalizeString(t?.email);
+  if (phone) telecom.push({ system: "phone", value: phone, use: "work" });
+  if (email) telecom.push({ system: "email", value: email, use: "work" });
+
+  return {
+    resourceType: "Practitioner",
+    active: Boolean(t?.active ?? true),
+    identifier: idNumber ? [{ system: "urn:medicalcare:therapist-id-number", value: idNumber }] : [],
+    name: nameText ? [{ text: nameText }] : undefined,
+    telecom: telecom.length ? telecom : undefined,
+  };
+}
+
+async function findPractitionerIdByIdentifier(idNumber) {
+  const idDigits = digitsOnly(idNumber);
+  if (!idDigits) return "";
+  const res = await medplum.search("Practitioner", {
+    identifier: `urn:medicalcare:therapist-id-number|${idDigits}`,
+    _count: "1",
+  });
+  return normalizeString(res?.entry?.[0]?.resource?.id);
+}
+
+async function readTherapistsIdb() {
+  const raw = await get(THERAPISTS_KEY);
+  return Array.isArray(raw) ? raw.filter(Boolean) : [];
+}
+
+async function writeTherapistsIdb(items) {
+  await set(THERAPISTS_KEY, Array.isArray(items) ? items.filter(Boolean) : []);
 }
 
 function SimplePage({ title, text }) {
@@ -98,6 +156,34 @@ function App() {
     }
   };
 
+  const handleSyncAllTherapistsToMedplum = useCallback(async (maybeItems) => {
+    if (!medplum.isAuthenticated()) {
+      throw new Error("Not connected to Medplum.");
+    }
+
+    const list = Array.isArray(maybeItems) && maybeItems.length ? maybeItems : await readTherapistsIdb();
+    if (!list.length) return;
+
+    const next = list.map((x) => ({ ...x }));
+
+    for (let i = 0; i < next.length; i++) {
+      const t = next[i];
+      const idNumber = digitsOnly(t?.idNumber || t?.id);
+      if (!idNumber) continue;
+
+      const resource = buildPractitioner({ ...t, idNumber });
+      const existingId = normalizeString(t?.remoteId) || (await findPractitionerIdByIdentifier(idNumber));
+
+      const saved = existingId
+        ? await medplum.updateResource({ ...resource, id: existingId })
+        : await medplum.createResource(resource);
+
+      next[i] = { ...t, remoteId: saved?.id || existingId || null };
+    }
+
+    await writeTherapistsIdb(next);
+  }, []);
+
   if (!authReady) {
     return <div className="app-loading">Loading MedicalCare...</div>;
   }
@@ -138,7 +224,14 @@ function App() {
 
             <Route path="/dashboard" element={<RequireAuth element={<DashboardPage patients={patients} />} />} />
 
-            <Route path="/users" element={<RequireAuth element={<UsersPage />} />} />
+            <Route
+              path="/users"
+              element={
+                <RequireAuth
+                  element={<UsersPage handleSyncAllTherapistsToMedplum={handleSyncAllTherapistsToMedplum} />}
+                />
+              }
+            />
 
             <Route
               path="/patients"
@@ -195,12 +288,7 @@ function App() {
               path="/data/care-plan"
               element={
                 <RequireAuth
-                  element={
-                    <CarePlansPage
-                      patients={patientsState.patients}
-                      onUpdatePatient={patientsState.handleUpdatePatientInline}
-                    />
-                  }
+                  element={<CarePlansPage patients={patientsState.patients} onUpdatePatient={patientsState.handleUpdatePatientInline} />}
                 />
               }
             />
@@ -214,19 +302,10 @@ function App() {
               }
             />
 
-            <Route
-              path="/analytics"
-              element={<RequireAuth element={<SimplePage title="Analytics" text="Dashboards and reports." />} />}
-            />
-            <Route
-              path="/security"
-              element={<RequireAuth element={<SimplePage title="Security" text="Security and permissions." />} />}
-            />
+            <Route path="/analytics" element={<RequireAuth element={<SimplePage title="Analytics" text="Dashboards and reports." />} />} />
+            <Route path="/security" element={<RequireAuth element={<SimplePage title="Security" text="Security and permissions." />} />} />
             <Route path="/api" element={<RequireAuth element={<SimplePage title="API" text="API configuration." />} />} />
-            <Route
-              path="/settings"
-              element={<RequireAuth element={<SimplePage title="Settings" text="Application settings." />} />}
-            />
+            <Route path="/settings" element={<RequireAuth element={<SimplePage title="Settings" text="Application settings." />} />} />
 
             <Route path="*" element={<Navigate to={loggedIn ? "/patients" : "/login"} replace />} />
           </Routes>

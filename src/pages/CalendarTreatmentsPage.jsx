@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { Bell } from "lucide-react";
+import { Bell, RefreshCw } from "lucide-react";
 
 import { useAppointments } from "../appointments/useAppointments";
 import AppointmentDrawer from "../appointments/AppointmentDrawer";
 import { getAllTherapists } from "../therapists/therapistsStore";
 import { useAuthContext } from "../hooks/useAuthContext";
+import { medplum } from "../medplumClient";
 import "./CalendarTreatmentsPage.css";
 
 const CLINIC_START_TIME = "07:00:00";
@@ -182,11 +184,52 @@ function checkPatientSameDayAndOverlap({
   return { ok: true, warned: false };
 }
 
+async function syncAppointmentToMedplum(appointment, therapistMap) {
+  if (!medplum.isAuthenticated()) {
+    throw new Error("Not connected to Medplum");
+  }
+
+  const therapistRemoteId = therapistMap.get(String(appointment.therapistId || "").trim());
+
+  const resource = {
+    resourceType: "Appointment",
+    status: appointment.status || "booked",
+    start: appointment.start,
+    end: appointment.end,
+    participant: [
+      {
+        actor: {
+          reference: therapistRemoteId
+            ? `Practitioner/${therapistRemoteId}`
+            : `Practitioner/${appointment.therapistId}`,
+        },
+        status: "accepted",
+      },
+    ],
+    comment: appointment.notes || undefined,
+  };
+
+  const remoteId = String(appointment.remoteId || "").trim();
+
+  if (remoteId) {
+    const updated = await medplum.updateResource({
+      ...resource,
+      id: remoteId,
+    });
+    return updated.id;
+  } else {
+    const created = await medplum.createResource(resource);
+    return created.id;
+  }
+}
+
 export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }) {
+  const navigate = useNavigate();
   const { isAdmin, therapistId } = useAuthContext();
-  const { appointments, loading, addAppointment, updateAppointment, deleteAppointment } = useAppointments();
+  const { appointments, loading, addAppointment, updateAppointment, deleteAppointment, refresh } = useAppointments();
 
   const [therapists, setTherapists] = useState([]);
+  const [syncing, setSyncing] = useState(false);
   const reloadRef = useRef(null);
 
   const reloadTherapists = async () => {
@@ -233,12 +276,22 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
     return map;
   }, [therapists]);
 
+  const therapistRemoteIdMap = useMemo(() => {
+    const map = new Map();
+    for (const t of Array.isArray(therapists) ? therapists : []) {
+      const id = String(t?.id || "").trim();
+      const remoteId = String(t?.remoteId || "").trim();
+      if (id && remoteId) map.set(id, remoteId);
+    }
+    return map;
+  }, [therapists]);
+
   const therapistOptions = useMemo(() => {
     return (Array.isArray(therapists) ? therapists : [])
       .filter((t) => t && t.active !== false)
       .map((t) => ({
         value: String(t.id).trim(),
-        label: String(t.name || t.id).trim(),
+        label: String(t.name || t.fullName || t.id).trim(),
       }))
       .filter((t) => t.value)
       .sort((a, b) => a.label.localeCompare(b.label));
@@ -534,6 +587,60 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
     setDrawerOpen(false);
   };
 
+  const handleSyncAppointments = async () => {
+    if (!isAdmin) return;
+    if (syncing) return;
+
+    if (!medplum.isAuthenticated()) {
+      alert("Not connected to Medplum. Please connect first.");
+      return;
+    }
+
+    try {
+      setSyncing(true);
+
+      const pending = appointments.filter((a) => a.pendingSync === true);
+
+      if (!pending.length) {
+        alert("All appointments are already synced!");
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const appt of pending) {
+        try {
+          const remoteId = await syncAppointmentToMedplum(appt, therapistRemoteIdMap);
+          await updateAppointment(appt.id, {
+            remoteId,
+            pendingSync: false,
+            syncError: null,
+          });
+          successCount++;
+        } catch (err) {
+          await updateAppointment(appt.id, {
+            pendingSync: true,
+            syncError: String(err?.message || "Sync failed"),
+          });
+          errorCount++;
+        }
+      }
+
+      await refresh();
+
+      if (errorCount === 0) {
+        alert(`Successfully synced ${successCount} appointments!`);
+      } else {
+        alert(`Synced ${successCount} appointments. ${errorCount} failed.`);
+      }
+    } catch (err) {
+      alert(`Sync failed: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleOpenNotifications = () => {
     alert("Notifications will be added next (reminders & permissions).");
   };
@@ -558,6 +665,18 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
           >
             <Bell size={18} />
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              className="mc-icon-button"
+              onClick={handleSyncAppointments}
+              disabled={syncing || !medplum.isAuthenticated()}
+              title="Sync to Medplum"
+            >
+              <RefreshCw size={18} />
+            </button>
+          )}
 
           <button type="button" className="mc-calendar-add" onClick={handleAddClick}>
             + Add
@@ -622,6 +741,25 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
               if (arg.view.type !== "dayGridMonth") return;
               arg.el.addEventListener("dblclick", () => {
                 arg.view.calendar.changeView("timeGridDay", arg.date);
+              });
+            }}
+            eventDidMount={(arg) => {
+              arg.el.style.cursor = "pointer";
+              arg.el.title = "Click to edit, Double-click to open patient file";
+
+              arg.el.addEventListener("dblclick", (e) => {
+                e.stopPropagation();
+
+                const appointment = arg.event.extendedProps?.appointment;
+                if (!appointment) return;
+
+                const patientId = String(appointment.patientId || "").replace(/\D/g, "").trim();
+                if (!patientId) {
+                  alert("No patient ID found for this appointment.");
+                  return;
+                }
+
+                navigate(`/patients/${patientId}`);
               });
             }}
             eventClassNames={(arg) => {

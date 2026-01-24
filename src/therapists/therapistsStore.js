@@ -96,10 +96,16 @@ function normalizeFromLegacyItem(raw) {
 }
 
 function normalizeFromIdbItem(raw) {
-  const id = digitsOnly(raw?.id);
+  const id = digitsOnly(raw?.id) || digitsOnly(raw?.idNumber) || digitsOnly(raw?.therapistId);
   if (!isValidTherapistId(id)) return null;
 
-  const name = normalize(raw?.name) || id;
+  const name =
+    normalize(raw?.name) ||
+    normalize(raw?.fullName) ||
+    normalize(raw?.displayName) ||
+    normalize(raw?.full_name) ||
+    id;
+
   const active = raw?.active !== false;
 
   const colorRaw = normalize(raw?.color);
@@ -145,6 +151,12 @@ function sortByName(list) {
   return list.slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
 }
 
+function hasExtraFieldsBeyondCalendarShape(item) {
+  if (!item || typeof item !== "object") return false;
+  const allowed = new Set(["id", "name", "active", "color"]);
+  return Object.keys(item).some((k) => !allowed.has(k));
+}
+
 async function migrateOrRepairIfNeeded() {
   const idbRaw = await readAllRaw();
   const idbNormalized = uniqueById(idbRaw.map(normalizeFromIdbItem).filter(Boolean));
@@ -156,7 +168,7 @@ async function migrateOrRepairIfNeeded() {
   const legacyHasAny = legacyNormalized.length > 0;
 
   const idbHasInvalid = safeArray(idbRaw).some((t) => {
-    const id = digitsOnly(t?.id);
+    const id = digitsOnly(t?.id) || digitsOnly(t?.idNumber) || digitsOnly(t?.therapistId);
     return id && !isValidTherapistId(id);
   });
 
@@ -171,6 +183,8 @@ async function migrateOrRepairIfNeeded() {
     return [];
   }
 
+  const rawHasExtraFields = safeArray(idbRaw).some(hasExtraFieldsBeyondCalendarShape);
+
   const changed =
     idbRaw.length !== idbNormalized.length ||
     idbRaw.some((t, i) => {
@@ -179,12 +193,13 @@ async function migrateOrRepairIfNeeded() {
       return (
         digitsOnly(prev.id) !== digitsOnly(next.id) ||
         normalize(prev.name) !== normalize(next.name) ||
+        normalize(prev.fullName) !== normalize(next.name) ||
         (prev.active !== false) !== (next.active !== false) ||
         normalize(prev.color).toLowerCase() !== normalize(next.color).toLowerCase()
       );
     });
 
-  if (changed) {
+  if (changed && !rawHasExtraFields) {
     await writeAll(idbNormalized);
   }
 

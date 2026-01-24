@@ -1,11 +1,15 @@
 // src/pages/UsersPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, RefreshCw } from "lucide-react";
 import { useAuthContext } from "../hooks/useAuthContext";
 import "./UsersPage.css";
 
-const STORAGE_KEY = "mc_therapists";
+const LS_STORAGE_KEY = "mc_therapists";
+const IDB_STORAGE_KEY = "mc_therapists_v1";
+
+const IDB_DB_NAME = "keyval-store";
+const IDB_STORE_NAME = "keyval";
 
 const DAY_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
 const DAY_ALIASES = {
@@ -62,28 +66,6 @@ function safeJsonStringify(value) {
   }
 }
 
-function readTherapists() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const data = safeJsonParse(raw, []);
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeTherapists(items) {
-  try {
-    localStorage.setItem(STORAGE_KEY, safeJsonStringify(items));
-  } catch {
-    // ignore
-  }
-}
-
-function uid() {
-  return `local-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
-}
-
 function normalizeString(v) {
   return String(v ?? "").trim();
 }
@@ -92,11 +74,12 @@ function normalizeDigits(v) {
   return normalizeString(v).replace(/\D/g, "");
 }
 
-function maskIdNumber(idNumber) {
-  const s = normalizeDigits(idNumber);
-  if (!s) return "";
-  if (s.length <= 4) return s;
-  return `****${s.slice(-4)}`;
+function isValidIdNumber(value) {
+  return /^\d{9}$/.test(normalizeDigits(value));
+}
+
+function uid() {
+  return `local-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
 }
 
 function pickRandomAccentKey() {
@@ -190,10 +173,6 @@ function isValidFullName(value) {
   return /^[A-Za-z][A-Za-z'-]*(\s[A-Za-z][A-Za-z'-]*)+$/.test(normalized);
 }
 
-function isValidIdNumber(value) {
-  return /^\d{9}$/.test(normalizeDigits(value));
-}
-
 function normalizePhone(value) {
   const raw = normalizeString(value);
   if (!raw) return "";
@@ -245,7 +224,9 @@ function validateForm(draft, workDaysText) {
 
   const fullName = normalizeFullName(draft.fullName);
   if (!fullName) errors.fullName = "Full name is required.";
-  else if (!isValidFullName(fullName)) errors.fullName = "Enter first and last name. Each word must start with a capital letter.";
+  else if (!isValidFullName(fullName)) {
+    errors.fullName = "Enter first and last name. Each word must start with a capital letter.";
+  }
 
   const idDigits = normalizeDigits(draft.idNumber);
   if (!idDigits) errors.idNumber = "ID number is required.";
@@ -273,9 +254,16 @@ function genderNameClass(gender) {
   return "users-name-none";
 }
 
+function maskIdNumber(idNumber) {
+  const s = normalizeDigits(idNumber);
+  if (!s) return "";
+  if (s.length <= 4) return s;
+  return `****${s.slice(-4)}`;
+}
+
 function defaultDraft() {
   return {
-    id: uid(),
+    id: "",
     fullName: "",
     idNumber: "",
     phone: "",
@@ -285,14 +273,193 @@ function defaultDraft() {
     active: true,
     gender: "not_specified",
     accentKey: pickRandomAccentKey(),
+    remoteId: null,
   };
 }
 
-export default function UsersPage() {
+function coerceTherapistsShape(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  if (data && Array.isArray(data.therapists)) return data.therapists;
+  return null;
+}
+
+function normalizeTherapistRecord(raw) {
+  const rawId = normalizeString(raw?.id);
+  const rawIdNumber = normalizeDigits(raw?.idNumber);
+
+  const idNumberCandidate =
+    rawIdNumber ||
+    (isValidIdNumber(rawId) ? rawId : "") ||
+    normalizeDigits(raw?.therapistId) ||
+    "";
+
+  const fullNameCandidate =
+    normalizeString(raw?.fullName) ||
+    normalizeString(raw?.name) ||
+    normalizeString(raw?.displayName) ||
+    "";
+
+  const stableId = idNumberCandidate ? idNumberCandidate : rawId || uid();
+
+  const activeValue =
+    typeof raw?.active === "boolean"
+      ? raw.active
+      : typeof raw?.isActive === "boolean"
+        ? raw.isActive
+        : true;
+
+  return {
+    id: stableId,
+    fullName: fullNameCandidate,
+    idNumber: idNumberCandidate,
+    phone: normalizeString(raw?.phone || ""),
+    address: normalizeString(raw?.address || ""),
+    email: normalizeString(raw?.email || ""),
+    workDays: normalizeWorkDays(raw?.workDays || []),
+    active: Boolean(activeValue),
+    gender: normalizeString(raw?.gender) || "not_specified",
+    accentKey: normalizeAccentKey(raw?.accentKey) || pickRandomAccentKey(),
+    remoteId: normalizeString(raw?.remoteId) || null,
+  };
+}
+
+function normalizeTherapistsList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((x) => normalizeTherapistRecord(x));
+}
+
+function readTherapistsFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(LS_STORAGE_KEY);
+    const data = safeJsonParse(raw, null);
+    const list = coerceTherapistsShape(data);
+    return normalizeTherapistsList(Array.isArray(list) ? list : []);
+  } catch {
+    return [];
+  }
+}
+
+function writeTherapistsToLocalStorage(items) {
+  try {
+    localStorage.setItem(LS_STORAGE_KEY, safeJsonStringify(items));
+  } catch {
+    // ignore
+  }
+}
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_DB_NAME);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        db.createObjectStore(IDB_STORE_NAME);
+      }
+    };
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+  });
+}
+
+async function idbGet(key) {
+  const db = await idbOpen();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_NAME, "readonly");
+      const store = tx.objectStore(IDB_STORE_NAME);
+      const req = store.get(key);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve(req.result);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_NAME, "readwrite");
+      const store = tx.objectStore(IDB_STORE_NAME);
+      const req = store.put(value, key);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => resolve();
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function mergeTherapistsLists(primary, secondary) {
+  const a = Array.isArray(primary) ? primary : [];
+  const b = Array.isArray(secondary) ? secondary : [];
+
+  const keyOf = (t) => {
+    const idNumber = normalizeDigits(t?.idNumber);
+    if (idNumber) return `idn:${idNumber}`;
+    const id = normalizeString(t?.id);
+    if (id) return `id:${id}`;
+    return `id:${uid()}`;
+  };
+
+  const mergeTwo = (prev, next) => {
+    const p = normalizeTherapistRecord(prev);
+    const n = normalizeTherapistRecord(next);
+
+    const nextWorkDays = Array.isArray(next?.workDays)
+      ? normalizeWorkDays(next.workDays)
+      : normalizeWorkDays(n.workDays);
+
+    const merged = {
+      ...p,
+      ...n,
+      id:
+        normalizeDigits(n.idNumber) ||
+        normalizeDigits(p.idNumber) ||
+        normalizeString(n.id) ||
+        normalizeString(p.id) ||
+        uid(),
+      idNumber: normalizeDigits(n.idNumber) || normalizeDigits(p.idNumber) || "",
+      fullName: normalizeString(n.fullName) || normalizeString(p.fullName) || "",
+      email: normalizeString(n.email) || normalizeString(p.email) || "",
+      phone: normalizeString(n.phone) || normalizeString(p.phone) || "",
+      address: normalizeString(n.address) || normalizeString(p.address) || "",
+      workDays: (nextWorkDays ?? normalizeWorkDays(p.workDays)).sort(
+        (x, y) => DAY_ORDER.indexOf(x) - DAY_ORDER.indexOf(y)
+      ),
+      remoteId: normalizeString(n.remoteId) || normalizeString(p.remoteId) || null,
+      accentKey: normalizeAccentKey(n.accentKey) || normalizeAccentKey(p.accentKey) || pickRandomAccentKey(),
+      gender: normalizeString(n.gender) || normalizeString(p.gender) || "not_specified",
+      active: typeof n.active === "boolean" ? n.active : typeof p.active === "boolean" ? p.active : true,
+    };
+
+    return merged;
+  };
+
+  const map = new Map();
+
+  const put = (t) => {
+    const norm = normalizeTherapistRecord(t);
+    const k = keyOf(norm);
+    const prev = map.get(k);
+    map.set(k, prev ? mergeTwo(prev, norm) : norm);
+  };
+
+  for (const t of a) put(t);
+  for (const t of b) put(t);
+
+  const result = Array.from(map.values());
+  result.sort((x, y) => normalizeString(x.fullName).localeCompare(normalizeString(y.fullName)));
+  return result;
+}
+
+export default function UsersPage({ handleSyncAllTherapistsToMedplum }) {
   const navigate = useNavigate();
   const { isAdmin, therapistId } = useAuthContext();
 
-  const [items, setItems] = useState(() => readTherapists());
+  const [items, setItems] = useState(() => readTherapistsFromLocalStorage());
   const [query, setQuery] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -301,8 +468,45 @@ export default function UsersPage() {
   const [workDaysText, setWorkDaysText] = useState(() => formatWorkDays(defaultDraft().workDays));
   const [errors, setErrors] = useState({});
 
+  const [syncing, setSyncing] = useState(false);
+
   useEffect(() => {
-    writeTherapists(items);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const fromIdb = await idbGet(IDB_STORAGE_KEY);
+        const idbList = normalizeTherapistsList(coerceTherapistsShape(fromIdb) || []);
+        const lsList = readTherapistsFromLocalStorage();
+
+        const merged = mergeTherapistsLists(idbList, lsList);
+
+        if (!cancelled) {
+          setItems(merged);
+          writeTherapistsToLocalStorage(merged);
+          await idbSet(IDB_STORAGE_KEY, merged);
+        }
+      } catch (err) {
+        console.error("Failed to load therapists from IndexedDB:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const normalized = normalizeTherapistsList(items);
+    writeTherapistsToLocalStorage(normalized);
+
+    (async () => {
+      try {
+        await idbSet(IDB_STORAGE_KEY, normalized);
+      } catch (err) {
+        console.error("Failed to save therapists to IndexedDB:", err);
+      }
+    })();
   }, [items]);
 
   const visibleItems = useMemo(() => {
@@ -344,19 +548,7 @@ export default function UsersPage() {
   }
 
   function openEdit(item) {
-    const next = {
-      id: normalizeString(item.id) || uid(),
-      fullName: normalizeString(item.fullName),
-      idNumber: normalizeDigits(item.idNumber),
-      phone: normalizeString(item.phone),
-      address: normalizeString(item.address),
-      email: normalizeString(item.email),
-      workDays: normalizeWorkDays(item.workDays),
-      active: Boolean(item.active),
-      gender: normalizeString(item.gender) || "not_specified",
-      accentKey: normalizeAccentKey(item.accentKey) || pickRandomAccentKey(),
-    };
-
+    const next = normalizeTherapistRecord(item);
     setMode("edit");
     setDraft(next);
     setWorkDaysText(formatWorkDays(next.workDays));
@@ -369,22 +561,42 @@ export default function UsersPage() {
   }
 
   function upsertItem(next) {
+    const normalizedNext = normalizeTherapistRecord(next);
+
     setItems((prev) => {
-      const idx = prev.findIndex((x) => normalizeString(x.id) === normalizeString(next.id));
-      if (idx === -1) return [next, ...prev];
-      const copy = prev.slice();
-      copy[idx] = next;
+      const prevList = Array.isArray(prev) ? prev : [];
+      const key = normalizeDigits(normalizedNext.idNumber) || normalizeString(normalizedNext.id);
+
+      const idx = prevList.findIndex((x) => {
+        const kx = normalizeDigits(x.idNumber) || normalizeString(x.id);
+        return kx === key;
+      });
+
+      if (idx === -1) return [normalizedNext, ...prevList];
+
+      const existing = prevList[idx];
+
+      const merged = mergeTherapistsLists([existing], [normalizedNext])[0] || normalizedNext;
+
+      const copy = prevList.slice();
+      copy[idx] = merged;
       return copy;
     });
   }
 
   function onDelete(id) {
     if (!isAdmin) return;
-    const targetId = normalizeString(id);
-    if (!targetId) return;
+    const target = normalizeDigits(id) || normalizeString(id);
+    if (!target) return;
     const ok = window.confirm("Delete this user?");
     if (!ok) return;
-    setItems((prev) => prev.filter((x) => normalizeString(x.id) !== targetId));
+
+    setItems((prev) =>
+      (Array.isArray(prev) ? prev : []).filter((x) => {
+        const kx = normalizeDigits(x.idNumber) || normalizeString(x.id);
+        return kx !== target;
+      })
+    );
   }
 
   function onBlurNormalize(field) {
@@ -397,7 +609,7 @@ export default function UsersPage() {
 
     if (field === "idNumber") {
       const v = normalizeDigits(draft.idNumber);
-      setDraft((p) => ({ ...p, idNumber: v }));
+      setDraft((p) => ({ ...p, idNumber: v, id: v || p.id }));
       setErrors((p) => ({ ...p, idNumber: validateForm({ ...draft, idNumber: v }, workDaysText).idNumber }));
       return;
     }
@@ -438,10 +650,13 @@ export default function UsersPage() {
   function onSubmit(e) {
     e.preventDefault();
 
+    const idNumberDigits = normalizeDigits(draft.idNumber);
+
     const normalizedDraft = {
       ...draft,
       fullName: normalizeFullName(draft.fullName),
-      idNumber: normalizeDigits(draft.idNumber),
+      idNumber: idNumberDigits,
+      id: idNumberDigits || normalizeString(draft.id) || uid(),
       phone: normalizePhone(draft.phone),
       email: normalizeString(draft.email),
       address: normalizeString(draft.address),
@@ -452,7 +667,6 @@ export default function UsersPage() {
 
     const next = {
       ...normalizedDraft,
-      id: normalizeString(normalizedDraft.id) || uid(),
       workDays: parsed.days,
       gender: normalizeString(normalizedDraft.gender) || "not_specified",
       active: Boolean(normalizedDraft.active),
@@ -460,6 +674,7 @@ export default function UsersPage() {
         mode === "create"
           ? pickRandomAccentKey()
           : normalizeAccentKey(normalizedDraft.accentKey) || pickRandomAccentKey(),
+      remoteId: normalizeString(normalizedDraft.remoteId) || null,
     };
 
     const nextErrors = validateForm(next, formattedDays);
@@ -480,6 +695,22 @@ export default function UsersPage() {
     }
   }, [isAdmin, therapistId, navigate]);
 
+  const handleClickSyncAll = async () => {
+    if (!isAdmin) return;
+    if (typeof handleSyncAllTherapistsToMedplum !== "function") return;
+    if (syncing) return;
+
+    try {
+      setSyncing(true);
+      await handleSyncAllTherapistsToMedplum(items);
+    } catch (err) {
+      console.error("Sync failed:", err);
+      alert(`Sync failed: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const pageTitle = isAdmin ? "Users" : "My Profile";
   const pageSubtitle = isAdmin ? "Manage therapists" : "Edit your profile";
 
@@ -493,12 +724,26 @@ export default function UsersPage() {
 
         <div className="patients-page-header-actions">
           {isAdmin ? (
-            <button type="button" className="patients-add-button" onClick={openCreate}>
-              <span className="patients-add-button-icon">
-                <Plus size={18} />
-              </span>
-              <span>Add user</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="patients-toolbar-button"
+                onClick={handleClickSyncAll}
+                disabled={syncing || typeof handleSyncAllTherapistsToMedplum !== "function"}
+              >
+                <span className="patients-toolbar-button-icon">
+                  <RefreshCw size={16} />
+                </span>
+                <span>{syncing ? "Syncing..." : "Sync All"}</span>
+              </button>
+
+              <button type="button" className="patients-add-button" onClick={openCreate}>
+                <span className="patients-add-button-icon">
+                  <Plus size={18} />
+                </span>
+                <span>Add user</span>
+              </button>
+            </>
           ) : null}
         </div>
       </div>
@@ -534,7 +779,9 @@ export default function UsersPage() {
                 <tr key={t.id}>
                   <td className="users-main-cell">
                     <div className="users-main">
-                      <div className={`users-main-title ${genderNameClass(t.gender)}`}>{normalizeString(t.fullName) || "—"}</div>
+                      <div className={`users-main-title ${genderNameClass(t.gender)}`}>
+                        {normalizeString(t.fullName) || "—"}
+                      </div>
                       <div className="users-main-subtitle">{normalizeString(t.email) || ""}</div>
                     </div>
                   </td>
@@ -569,7 +816,7 @@ export default function UsersPage() {
                       <button
                         type="button"
                         className="users-icon-btn users-icon-btn-danger"
-                        onClick={() => onDelete(t.id)}
+                        onClick={() => onDelete(t.idNumber || t.id)}
                         aria-label="Delete"
                       >
                         <Trash2 size={16} />
