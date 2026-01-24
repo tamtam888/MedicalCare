@@ -1,4 +1,3 @@
-/* Page layout */
 .mc-calendar-page {
   display: flex;
   flex-direction: column;
@@ -38,39 +37,54 @@
   gap: 10px;
 }
 
-/* Top right: bell */
 .mc-icon-button {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(168, 85, 247, 0.32);
+  background: rgba(255, 255, 255, 0.96);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: rgba(17, 24, 39, 0.82);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease, background-color 0.15s ease;
 }
 
 .mc-icon-button:hover {
-  border-color: rgba(0, 0, 0, 0.14);
+  border-color: rgba(168, 85, 247, 0.55);
   background: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.14);
+  transform: translateY(-1px);
 }
 
-/* + Add: purple outline like your UI */
+.mc-icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.22);
+}
+
 .mc-calendar-add {
-  padding: 0.45rem 0.95rem;
+  height: 40px;
+  padding: 0 14px;
   border-radius: 12px;
   border: 2px solid rgba(168, 85, 247, 0.55);
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: rgba(255, 255, 255, 0.98);
   color: rgba(17, 24, 39, 0.9);
-  font-weight: 750;
+  font-weight: 800;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease, background-color 0.15s ease;
 }
 
 .mc-calendar-add:hover {
-  border-color: rgba(99, 102, 241, 0.55);
+  border-color: rgba(99, 102, 241, 0.6);
   background-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 10px 18px rgba(17, 24, 39, 0.06);
+  transform: translateY(-1px);
+}
+
+.mc-calendar-add:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.22);
 }
 
 .mc-calendar-card {
@@ -78,32 +92,32 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
 }
 
 .mc-calendar-shell {
   padding: 12px;
 }
 
-/* ========== FullCalendar theming ========== */
-/* Keep the grid clean & clinical */
 .fc {
   --fc-border-color: rgba(0, 0, 0, 0.08);
   --fc-today-bg-color: rgba(168, 85, 247, 0.06);
   --fc-page-bg-color: #ffffff;
   --fc-neutral-bg-color: rgba(0, 0, 0, 0.03);
   --fc-list-event-hover-bg-color: rgba(0, 0, 0, 0.03);
+  --fc-now-indicator-color: rgba(168, 85, 247, 0.95);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Title style */
+.fc .fc-toolbar {
+  margin: 6px 6px 10px;
+  gap: 10px;
+}
+
 .fc .fc-toolbar-title {
   font-size: 16px;
-  font-weight: 750;
+  font-weight: 800;
   color: rgba(17, 24, 39, 0.92);
-}
-
-/* Toolbar spacing */
-.fc .fc-toolbar {
-  gap: 10px;
 }
 
 .fc .fc-toolbar-chunk {
@@ -112,60 +126,59 @@
   gap: 8px;
 }
 
-/* --- Buttons: make everything match your purple rounded UI --- */
 .fc .fc-button-group {
   gap: 6px;
 }
 
-/* Base button */
 .fc .fc-button {
   border-radius: 999px;
-  padding: 0.35rem 0.9rem;
-  font-weight: 650;
-  font-size: 0.85rem;
+  padding: 0.38rem 0.92rem;
+  font-weight: 750;
+  font-size: 0.86rem;
   border: 1.5px solid rgba(168, 85, 247, 0.35);
   background-color: rgba(168, 85, 247, 0.08);
   color: rgba(88, 28, 135, 0.96);
   box-shadow: none;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.08s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease,
+    box-shadow 0.15s ease;
 }
 
 .fc .fc-button:hover {
   background-color: rgba(168, 85, 247, 0.14);
   border-color: rgba(168, 85, 247, 0.55);
   color: rgba(88, 28, 135, 1);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.14);
+  transform: translateY(-1px);
 }
 
 .fc .fc-button:active {
   transform: translateY(0.5px);
 }
 
-/* Active (selected) view button */
 .fc .fc-button-primary:not(:disabled).fc-button-active,
 .fc .fc-button-primary:not(:disabled):active {
   background-color: rgba(168, 85, 247, 0.88);
   border-color: rgba(168, 85, 247, 0.88);
   color: #ffffff;
-  font-weight: 750;
+  font-weight: 800;
+  box-shadow: none;
 }
 
-/* Disabled */
 .fc .fc-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-/* Focus accessibility */
 .fc .fc-button:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.22);
+  box-shadow: none;
 }
 
-/* navLinks (clickable day headers) */
+.fc .fc-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.22);
+}
+
 .fc a {
   color: rgba(17, 24, 39, 0.82);
   text-decoration: none;
@@ -176,67 +189,186 @@
   text-decoration: underline;
 }
 
-/* ========== Events (Google-like readability) ========== */
-/* Base event: readable, black text, mild tint */
+.fc .fc-scrollgrid,
+.fc .fc-scrollgrid-section > td,
+.fc .fc-timegrid-body,
+.fc .fc-timegrid-axis,
+.fc .fc-timegrid-slot,
+.fc .fc-col-header-cell,
+.fc .fc-daygrid-day {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 10px 6px;
+  font-weight: 900;
+  color: rgba(17, 24, 39, 0.9);
+  font-size: 12.5px;
+}
+
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-timegrid-slot-label-cushion {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(17, 24, 39, 0.62);
+}
+
+.fc .fc-timegrid-slot {
+  height: 2.35em;
+}
+
+.fc .fc-timegrid-now-indicator-line {
+  border-color: rgba(168, 85, 247, 0.95);
+  border-width: 2px;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-color: rgba(168, 85, 247, 0.95);
+}
+
+.fc .fc-highlight {
+  background: rgba(168, 85, 247, 0.14);
+}
+
+.fc .fc-timegrid-col.fc-day-today {
+  background: rgba(168, 85, 247, 0.06);
+}
+
+.fc .fc-timegrid-event-harness,
+.fc .fc-daygrid-event-harness {
+  margin-left: 3px;
+  margin-right: 3px;
+}
+
+.fc .fc-event {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  overflow: hidden;
+}
+
+.fc .fc-event:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.22);
+  border-radius: 12px;
+}
+
+.fc .fc-event .fc-event-main {
+  padding: 6px 8px;
+}
+
+.fc .fc-event .fc-event-time {
+  font-weight: 900;
+  font-size: 11px;
+  opacity: 0.92;
+}
+
+.fc .fc-event .fc-event-title {
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
 .mc-event {
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid rgba(99, 102, 241, 0.22);
   background: rgba(99, 102, 241, 0.14);
   color: #111827;
-  font-weight: 750;
+  font-weight: 800;
   font-size: 12px;
   line-height: 1.25;
+  box-shadow: 0 10px 18px rgba(17, 24, 39, 0.08);
 }
 
-/* Ensure inner event text stays black */
 .mc-event .fc-event-title,
 .mc-event .fc-event-time {
   color: #111827;
-  font-weight: 750;
+  font-weight: 900;
 }
 
-/* Active vs past */
 .mc-event--active {
-  background: rgba(99, 102, 241, 0.16);
-  border-color: rgba(99, 102, 241, 0.26);
+  opacity: 1;
 }
 
 .mc-event--past {
-  background: rgba(99, 102, 241, 0.08);
-  border-color: rgba(99, 102, 241, 0.14);
-  opacity: 0.66;
+  opacity: 0.62;
+  box-shadow: none;
 }
 
-/* Pending sync (optional) */
 .mc-event--pending {
   outline: 2px dashed rgba(0, 0, 0, 0.18);
   outline-offset: 2px;
 }
 
-/* Therapist colors (6 calm variants) */
+.mc-event--t0,
+.mc-event--t1,
+.mc-event--t2,
+.mc-event--t3,
+.mc-event--t4,
+.mc-event--t5 {
+  position: relative;
+}
+
+.mc-event--t0::before,
+.mc-event--t1::before,
+.mc-event--t2::before,
+.mc-event--t3::before,
+.mc-event--t4::before,
+.mc-event--t5::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-left: 6px solid transparent;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
 .mc-event--t0 {
   background: rgba(99, 102, 241, 0.16);
   border-color: rgba(99, 102, 241, 0.26);
 }
+.mc-event--t0::before {
+  border-left-color: rgba(99, 102, 241, 0.85);
+}
+
 .mc-event--t1 {
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.22);
 }
+.mc-event--t1::before {
+  border-left-color: rgba(16, 185, 129, 0.8);
+}
+
 .mc-event--t2 {
   background: rgba(245, 158, 11, 0.14);
   border-color: rgba(245, 158, 11, 0.22);
 }
+.mc-event--t2::before {
+  border-left-color: rgba(245, 158, 11, 0.8);
+}
+
 .mc-event--t3 {
   background: rgba(168, 85, 247, 0.14);
   border-color: rgba(168, 85, 247, 0.22);
 }
+.mc-event--t3::before {
+  border-left-color: rgba(168, 85, 247, 0.85);
+}
+
 .mc-event--t4 {
   background: rgba(236, 72, 153, 0.12);
   border-color: rgba(236, 72, 153, 0.2);
 }
+.mc-event--t4::before {
+  border-left-color: rgba(236, 72, 153, 0.8);
+}
+
 .mc-event--t5 {
   background: rgba(100, 116, 139, 0.12);
   border-color: rgba(100, 116, 139, 0.18);
+}
+.mc-event--t5::before {
+  border-left-color: rgba(100, 116, 139, 0.75);
 }
 
 @media (max-width: 768px) {
@@ -248,4 +380,22 @@
   .mc-calendar-shell {
     padding: 10px;
   }
+}
+.fc-timegrid-event .fc-event-time {
+  display: none;
+}
+
+.fc-daygrid-event .fc-event-time {
+  display: inline-block;
+  margin-right: 6px;
+  font-weight: 900;
+  font-size: 11px;
+  opacity: 0.9;
+}
+.fc-timegrid-event .fc-event-time {
+  display: none;
+}
+
+.fc-daygrid-event .fc-event-time {
+  display: inline-block;
 }

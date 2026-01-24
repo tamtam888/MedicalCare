@@ -1,5 +1,7 @@
-// src/pages/DashboardPage.jsx
+import { useEffect, useMemo, useState } from "react";
 import "./DashboardPage.css";
+import { useAuthContext } from "../hooks/useAuthContext";
+import { deleteTherapist, getAllTherapists, upsertTherapist } from "../therapists/therapistsStore";
 
 function BellIcon() {
   return (
@@ -20,6 +22,41 @@ function SettingsIcon() {
 }
 
 function DashboardPage({ patients = [] }) {
+  const { role, therapistId, isAdmin, setRole, setTherapistId } = useAuthContext();
+
+  const [therapists, setTherapists] = useState([]);
+  const [loadingTherapists, setLoadingTherapists] = useState(true);
+  const [newTherapistName, setNewTherapistName] = useState("");
+  const [newTherapistId, setNewTherapistId] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const list = await getAllTherapists();
+        if (!cancelled) setTherapists(list);
+      } finally {
+        if (!cancelled) setLoadingTherapists(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const therapistOptions = useMemo(() => {
+    return (therapists || []).filter((t) => t.active !== false);
+  }, [therapists]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    const exists = therapistOptions.some((t) => String(t.id) === String(therapistId));
+    if (!exists && therapistOptions.length) setTherapistId(therapistOptions[0].id);
+  }, [isAdmin, therapistId, therapistOptions, setTherapistId]);
+
   const totalPatients = patients.length;
 
   const activeCases = patients.filter((p) => {
@@ -32,10 +69,7 @@ function DashboardPage({ patients = [] }) {
     return status === "recovered" || status === "discharged";
   }).length;
 
-  const recoveryRate =
-    totalPatients > 0
-      ? Math.round((recoveredCases / totalPatients) * 100)
-      : 0;
+  const recoveryRate = totalPatients > 0 ? Math.round((recoveredCases / totalPatients) * 100) : 0;
 
   const conditionCounts = {};
   patients.forEach((p) => {
@@ -54,32 +88,47 @@ function DashboardPage({ patients = [] }) {
     });
   });
 
-  const conditionEntries = Object.entries(conditionCounts).sort(
-    (a, b) => b[1] - a[1]
-  );
+  const conditionEntries = Object.entries(conditionCounts).sort((a, b) => b[1] - a[1]);
+
+  const saveNewTherapist = async () => {
+    const name = String(newTherapistName || "").trim();
+    const id = String(newTherapistId || "").trim();
+    if (!name) return;
+
+    const created = await upsertTherapist({ id: id || undefined, name, active: true });
+    const list = await getAllTherapists();
+    setTherapists(list);
+
+    setNewTherapistName("");
+    setNewTherapistId("");
+
+    if (!isAdmin) setTherapistId(created.id);
+  };
+
+  const removeTherapist = async (id) => {
+    const tid = String(id || "").trim();
+    if (!tid || tid === "local-therapist") return;
+
+    const ok = window.confirm("Delete this therapist?");
+    if (!ok) return;
+
+    await deleteTherapist(tid);
+    const list = await getAllTherapists();
+    setTherapists(list);
+  };
 
   return (
     <div className="dashboard-page">
       <div className="dashboard-main">
         <div className="dashboard-topbar">
           <div className="topbar-left">
-            <span className="topbar-title">
-              MedicalCare - Patient &amp; Treatment Manager
-            </span>
+            <span className="topbar-title">MedicalCare - Patient &amp; Treatment Manager</span>
           </div>
           <div className="topbar-right">
-            <button
-              type="button"
-              className="topbar-icon-button"
-              aria-label="Notifications"
-            >
+            <button type="button" className="topbar-icon-button" aria-label="Notifications">
               <BellIcon />
             </button>
-            <button
-              type="button"
-              className="topbar-icon-button"
-              aria-label="Settings"
-            >
+            <button type="button" className="topbar-icon-button" aria-label="Settings">
               <SettingsIcon />
             </button>
           </div>
@@ -88,9 +137,127 @@ function DashboardPage({ patients = [] }) {
         <header className="dashboard-header">
           <div className="dashboard-header-text">
             <p className="dashboard-welcome">Welcome back</p>
-            <h1 className="dashboard-title">MedicalCare Dashboard</h1>
+           
           </div>
         </header>
+
+        <section className="dashboard-split-row">
+          <article className="panel-card">
+            <div className="panel-header">
+              <h2 className="panel-title">Signed in as</h2>
+            </div>
+
+            <div className="panel-body">
+              <div className="mc-panel-stack">
+                <div className="mc-form-row">
+                  <label className="mc-label">Role</label>
+                  <select className="mc-select" value={role} onChange={(e) => setRole(e.target.value)}>
+                    <option value="therapist">Therapist</option>
+                    <option value="admin">Admin</option>
+                  </select>
+
+                  {!isAdmin ? (
+                    <>
+                      <label className="mc-label">Therapist</label>
+                      <select
+                        className="mc-select"
+                        value={therapistId}
+                        onChange={(e) => setTherapistId(e.target.value)}
+                        disabled={loadingTherapists}
+                      >
+                        {therapistOptions.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.id})
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <div className="mc-hint">Admin can view all therapists in the calendar.</div>
+                  )}
+                </div>
+
+                <div className="mc-divider" />
+
+                <div className="mc-panel-stack">
+                  <div className="mc-section-title">Therapists</div>
+
+                  <div className="mc-form-row mc-form-row--wrap">
+                    <input
+                      className="mc-input"
+                      value={newTherapistName}
+                      onChange={(e) => setNewTherapistName(e.target.value)}
+                      placeholder="Name (required)"
+                    />
+                    <input
+                      className="mc-input"
+                      value={newTherapistId}
+                      onChange={(e) => setNewTherapistId(e.target.value)}
+                      placeholder="ID (optional, e.g. therapist-1)"
+                    />
+                    <button type="button" className="mc-btn mc-btn--primary" onClick={saveNewTherapist}>
+                      Add therapist
+                    </button>
+                  </div>
+
+                  {loadingTherapists ? (
+                    <div className="panel-empty">Loading therapists...</div>
+                  ) : therapistOptions.length === 0 ? (
+                    <div className="panel-empty">No therapists yet.</div>
+                  ) : (
+                    <ul className="mc-list">
+                      {therapistOptions.map((t) => (
+                        <li key={t.id} className="mc-list-item">
+                          <div className="mc-list-item-text">
+                            <strong>{t.name}</strong> <span className="mc-muted">({t.id})</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="mc-btn mc-btn--danger"
+                            onClick={() => removeTherapist(t.id)}
+                            disabled={t.id === "local-therapist"}
+                          >
+                            Delete
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="panel-card">
+            <div className="panel-header">
+              <h2 className="panel-title">Conditions Distribution</h2>
+            </div>
+            <div className="panel-body">
+              {conditionEntries.length === 0 ? (
+                <p className="panel-empty">No condition data yet. Add patients with conditions to see distribution.</p>
+              ) : (
+                <ul className="distribution-list">
+                  {conditionEntries.map(([name, count]) => (
+                    <li key={name} className="distribution-item">
+                      <span className="distribution-name">{name.charAt(0).toUpperCase() + name.slice(1)}</span>
+                      <span className="distribution-bar-wrap">
+                        <span
+                          className="distribution-bar"
+                          style={{
+                            width: totalPatients > 0 ? `${Math.round((count / totalPatients) * 100)}%` : "0%",
+                          }}
+                        />
+                      </span>
+                      <span className="distribution-count">
+                        {count} / {totalPatients}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </article>
+        </section>
 
         <section className="dashboard-cards-row">
           <article className="stat-card">
@@ -121,93 +288,29 @@ function DashboardPage({ patients = [] }) {
           </article>
         </section>
 
-        <section className="dashboard-split-row">
-          <article className="panel-card">
-            <div className="panel-header">
-              <h2 className="panel-title">Conditions Distribution</h2>
-            </div>
-            <div className="panel-body">
-              {conditionEntries.length === 0 ? (
-                <p className="panel-empty">
-                  No condition data yet. Add patients with conditions to see
-                  distribution.
-                </p>
-              ) : (
-                <ul className="distribution-list">
-                  {conditionEntries.map(([name, count]) => (
-                    <li key={name} className="distribution-item">
-                      <span className="distribution-name">
-                        {name.charAt(0).toUpperCase() + name.slice(1)}
-                      </span>
-                      <span className="distribution-bar-wrap">
-                        <span
-                          className="distribution-bar"
-                          style={{
-                            width:
-                              totalPatients > 0
-                                ? `${Math.round(
-                                    (count / totalPatients) * 100
-                                  )}%`
-                                : "0%",
-                          }}
-                        />
-                      </span>
-                      <span className="distribution-count">
-                        {count} / {totalPatients}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </article>
-
-          <article className="panel-card">
-            <div className="panel-header">
-              <h2 className="panel-title">Clinical Status Distribution</h2>
-            </div>
-            <div className="panel-body">
-              <p className="panel-empty">
-                Status charts can be added here later (Stable, Active, High
-                risk).
-              </p>
-            </div>
-          </article>
-        </section>
-
         <section className="dashboard-features-row">
           <article className="feature-card">
             <div className="feature-icon">📅</div>
             <h3 className="feature-title">Treatment Calendar</h3>
-            <p className="feature-text">
-              Schedule and track upcoming treatment sessions in a dedicated
-              calendar.
-            </p>
+            <p className="feature-text">Schedule and track upcoming treatment sessions in a dedicated calendar.</p>
           </article>
 
           <article className="feature-card">
             <div className="feature-icon">📄</div>
             <h3 className="feature-title">Treatment Summary PDF</h3>
-            <p className="feature-text">
-              Generate professional PDF summaries combining notes and plans.
-            </p>
+            <p className="feature-text">Generate professional PDF summaries combining notes and plans.</p>
           </article>
 
           <article className="feature-card">
             <div className="feature-icon">🧩</div>
             <h3 className="feature-title">Care Plan Builder</h3>
-            <p className="feature-text">
-              Build structured care plans with goals, exercises and schedules.
-            </p>
+            <p className="feature-text">Build structured care plans with goals, exercises and schedules.</p>
           </article>
 
           <article className="feature-card">
             <div className="feature-icon">🎙️</div>
             <h3 className="feature-title">Treatment Transcriptions</h3>
-            <p className="feature-text">
-              Record and transcribe sessions for accurate clinical
-              documentation.
-            </p>
+            <p className="feature-text">Record and transcribe sessions for accurate clinical documentation.</p>
           </article>
         </section>
       </div>

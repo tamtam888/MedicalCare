@@ -1,5 +1,4 @@
-// src/pages/PatientDetailsPage.jsx
-import React, { useEffect, useMemo, useState, useId } from "react";
+import React, { useEffect, useMemo, useState, useId, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./PatientDetailsPage.css";
 
@@ -9,6 +8,10 @@ import AttachReports from "../components/AttachReports";
 import CarePlanSection from "../components/CarePlanSection";
 import { formatDateDMY, parseFlexibleDate } from "../utils/dateFormat";
 import { Upload, Download, RefreshCw, X } from "lucide-react";
+
+import PatientAppointments from "../components/PatientAppointments";
+import AppointmentDrawer from "../appointments/AppointmentDrawer";
+import { useAppointments } from "../appointments/useAppointments";
 
 function buildFullName(p) {
   const first = (p?.firstName || "").trim();
@@ -109,6 +112,10 @@ function pickMedplumPatientId(p) {
     if (v) return v;
   }
   return "";
+}
+
+function getAppointmentId(a) {
+  return a?.id || a?.appointmentId || a?._id || null;
 }
 
 function CollapsibleBlock({ title, subtitle = "", defaultOpen = false, children }) {
@@ -222,36 +229,118 @@ export default function PatientDetailsPage({
     if (e?.target) e.target.value = "";
   };
 
-  const onSaveTranscriptionLocal = (payloadOrPatientId, maybeText, maybeAudioId) => {
-    const patientId = editablePatient?.idNumber;
-    if (!patientId) return;
+  const onSaveTranscriptionLocal = useCallback(
+    (payloadOrPatientId, maybeText, maybeAudioId) => {
+      const patientId = editablePatient?.idNumber;
+      if (!patientId) return;
 
-    let text = "";
-    let audioId = null;
-    let createdAt = Date.now();
+      let text = "";
+      let audioId = null;
 
-    if (typeof payloadOrPatientId === "object" && payloadOrPatientId) {
-      text = String(payloadOrPatientId.text || "").trim();
-      audioId = payloadOrPatientId.audioId || null;
-      createdAt = payloadOrPatientId.createdAt || Date.now();
-    } else {
-      text = String(maybeText || "").trim();
-      audioId = maybeAudioId || null;
-      createdAt = Date.now();
-    }
+      if (typeof payloadOrPatientId === "object" && payloadOrPatientId) {
+        text = String(payloadOrPatientId.text || "").trim();
+        audioId = payloadOrPatientId.audioId || null;
+      } else {
+        text = String(maybeText || "").trim();
+        audioId = maybeAudioId || null;
+      }
 
-    if (!text && !audioId) return;
+      if (!text && !audioId) return;
 
-    handleSelectPatient?.(patientId);
-    if (typeof handleSaveTranscription === "function") {
-      handleSaveTranscription(patientId, text, audioId || null);
-    }
-  };
+      handleSelectPatient?.(patientId);
+      if (typeof handleSaveTranscription === "function") {
+        handleSaveTranscription(patientId, text, audioId || null);
+      }
+    },
+    [editablePatient?.idNumber, handleSelectPatient, handleSaveTranscription]
+  );
 
   const handleClickSyncPatient = () => {
     const patientId = editablePatient?.idNumber;
     if (!patientId) return;
     if (typeof handleSyncPatientToMedplum === "function") handleSyncPatientToMedplum(patientId);
+  };
+
+  const { addAppointment, updateAppointment, deleteAppointment } = useAppointments();
+
+  const [apptDrawerOpen, setApptDrawerOpen] = useState(false);
+  const [apptDrawerMode, setApptDrawerMode] = useState("add");
+  const [apptInitialValues, setApptInitialValues] = useState(null);
+  const [apptEditingId, setApptEditingId] = useState(null);
+  const [apptSaving, setApptSaving] = useState(false);
+
+  const openAddAppointmentForPatient = () => {
+    const pid = String(editablePatient?.idNumber || "").replace(/\D/g, "");
+    if (!pid) return;
+
+    setApptEditingId(null);
+    setApptDrawerMode("add");
+    setApptInitialValues({
+      patientId: pid,
+      therapistId: "",
+      start: "",
+      end: "",
+      status: "scheduled",
+      notes: "",
+    });
+    setApptDrawerOpen(true);
+  };
+
+  const openEditAppointment = (appt) => {
+    if (!appt) return;
+
+    const id = getAppointmentId(appt);
+
+    setApptEditingId(id);
+    setApptDrawerMode("edit");
+    setApptInitialValues({
+      patientId: appt.patientId,
+      therapistId: appt.therapistId || "",
+      start: appt.start || "",
+      end: appt.end || "",
+      status: appt.status || "scheduled",
+      notes: appt.notes || "",
+    });
+    setApptDrawerOpen(true);
+  };
+
+  const closeApptDrawer = () => {
+    setApptDrawerOpen(false);
+    setApptEditingId(null);
+    setApptDrawerMode("add");
+    setApptInitialValues(null);
+  };
+
+  const handleSaveAppointment = async (values) => {
+    try {
+      setApptSaving(true);
+
+      if (apptDrawerMode === "edit") {
+        if (!apptEditingId) return;
+        await updateAppointment(apptEditingId, values);
+      } else {
+        await addAppointment(values);
+      }
+
+      closeApptDrawer();
+    } finally {
+      setApptSaving(false);
+    }
+  };
+
+  const handleDeleteAppointment = async () => {
+    if (!apptEditingId) return;
+
+    const ok = window.confirm("Delete this appointment?");
+    if (!ok) return;
+
+    try {
+      setApptSaving(true);
+      await deleteAppointment(apptEditingId);
+      closeApptDrawer();
+    } finally {
+      setApptSaving(false);
+    }
   };
 
   if (!editablePatient) {
@@ -350,6 +439,7 @@ export default function PatientDetailsPage({
       </div>
 
       <div className="patient-sections-stack">
+        {/* 1) PatientDetails */}
         <CollapsibleBlock title="Patient details" subtitle={detailsSubtitle} defaultOpen={false}>
           <div className="patient-details-top-row">
             <div className="details-row-inline">
@@ -365,7 +455,12 @@ export default function PatientDetailsPage({
 
             <div className="details-row-inline">
               <span className="details-label">Email</span>
-              <InlineEditable value={editablePatient.email || ""} placeholder="Add email" onChange={(val) => updateField("email", val)} className="details-value" />
+              <InlineEditable
+                value={editablePatient.email || ""}
+                placeholder="Add email"
+                onChange={(val) => updateField("email", val)}
+                className="details-value"
+              />
             </div>
 
             <div className="details-row-inline">
@@ -381,7 +476,11 @@ export default function PatientDetailsPage({
 
           <div className="status-row">
             <span className="details-label">Clinical status</span>
-            <select className="inline-input status-select" value={editablePatient.clinicalStatus || ""} onChange={(e) => updateField("clinicalStatus", e.target.value)}>
+            <select
+              className="inline-input status-select"
+              value={editablePatient.clinicalStatus || ""}
+              onChange={(e) => updateField("clinicalStatus", e.target.value)}
+            >
               <option value="">Not Active</option>
               <option value="Active">Active</option>
               <option value="Stable">Stable</option>
@@ -392,18 +491,48 @@ export default function PatientDetailsPage({
           </div>
         </CollapsibleBlock>
 
+        {/* 2) Appointment */}
+        <CollapsibleBlock title="Appointments" subtitle="Upcoming and past visits" defaultOpen={false}>
+          <div className="patients-page-header-actions">
+            <button type="button" className="patients-toolbar-button" onClick={openAddAppointmentForPatient}>
+              <span>Add appointment</span>
+            </button>
+          </div>
+
+          <PatientAppointments
+            patient={editablePatient}
+            patientFullName={buildFullName(editablePatient)}
+            isAdmin={false}
+            onOpenAppointment={openEditAppointment}
+          />
+        </CollapsibleBlock>
+
+        {/* 3) TreatmentTransaction */}
         <CollapsibleBlock title="Treatment transcription" subtitle="Record and improve visit notes" defaultOpen={true}>
           <RecordAudio selectedPatient={editablePatient} onSaveTranscription={onSaveTranscriptionLocal} />
         </CollapsibleBlock>
 
-        <CollapsibleBlock title="Care plan" subtitle="Goals and exercises" defaultOpen={false}>
-          <CarePlanSection patient={editablePatient} onUpdatePatient={updatePatient} onSaveCarePlanEntry={handleSaveCarePlanEntry} />
-        </CollapsibleBlock>
-
+        {/* 4) History */}
         <CollapsibleBlock title="History" subtitle={historySubtitle} defaultOpen={false}>
-          <PatientHistory patient={editablePatient} history={editablePatient.history || []} onChangeHistory={updateHistory} selectedIds={selectedHistoryIds} onToggleSelected={toggleHistorySelected} />
+          <PatientHistory
+            patient={editablePatient}
+            history={editablePatient.history || []}
+            onChangeHistory={updateHistory}
+            selectedIds={selectedHistoryIds}
+            onToggleSelected={toggleHistorySelected}
+          />
         </CollapsibleBlock>
 
+        {/* 5) CarePlan */}
+        <CollapsibleBlock title="Care plan" subtitle="Goals and exercises" defaultOpen={false}>
+          <CarePlanSection
+            patient={editablePatient}
+            onUpdatePatient={updatePatient}
+            onSaveCarePlanEntry={handleSaveCarePlanEntry}
+          />
+        </CollapsibleBlock>
+
+        {/* 6) Report */}
         <CollapsibleBlock title="Reports" subtitle={reportsSubtitle} defaultOpen={false}>
           <AttachReports
             patient={editablePatient}
@@ -434,6 +563,17 @@ export default function PatientDetailsPage({
           />
         </CollapsibleBlock>
       </div>
+
+      <AppointmentDrawer
+        open={apptDrawerOpen}
+        mode={apptDrawerMode}
+        patients={patients}
+        initialValues={apptInitialValues}
+        onClose={closeApptDrawer}
+        onSave={handleSaveAppointment}
+        onDelete={handleDeleteAppointment}
+        loading={apptSaving}
+      />
     </div>
   );
 }

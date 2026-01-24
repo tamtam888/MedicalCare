@@ -40,6 +40,45 @@ function normalizeAppointmentPatch(patch) {
   return next;
 }
 
+function toMs(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function overlaps(aStart, aEnd, bStart, bEnd) {
+  const s1 = toMs(aStart);
+  const e1 = toMs(aEnd);
+  const s2 = toMs(bStart);
+  const e2 = toMs(bEnd);
+
+  if (![s1, e1, s2, e2].every(Number.isFinite)) return false;
+  if (e1 <= s1 || e2 <= s2) return false;
+
+  return s2 < e1 && e2 > s1;
+}
+
+function hasTherapistConflict(allAppointments, candidate, ignoreId = null) {
+  const therapistId = String(candidate?.therapistId || "").trim();
+  if (!therapistId) return false;
+
+  return (allAppointments || []).some((a) => {
+    if (!a) return false;
+    if (ignoreId && String(a.id) === String(ignoreId)) return false;
+    if (String(a.therapistId || "").trim() !== therapistId) return false;
+
+    return overlaps(a.start, a.end, candidate.start, candidate.end);
+  });
+}
+
+function assertNoConflict(allAppointments, candidate, ignoreId = null) {
+  if (hasTherapistConflict(allAppointments, candidate, ignoreId)) {
+    const err = new Error("This time is not available for the selected therapist (double booking).");
+    err.code = "APPOINTMENT_CONFLICT";
+    throw err;
+  }
+}
+
 export async function getAllAppointments() {
   const raw = await get(APPOINTMENTS_KEY);
   const list = safeArray(raw);
@@ -72,6 +111,13 @@ export async function createAppointment(input) {
   const appointment = buildAppointment(normalizedInput);
 
   const existing = await getAllAppointments();
+
+  assertNoConflict(existing, {
+    therapistId: appointment.therapistId,
+    start: appointment.start,
+    end: appointment.end,
+  });
+
   const next = [
     ...existing,
     {
@@ -89,7 +135,22 @@ export async function updateAppointment(id, patch) {
   const existing = await getAllAppointments();
   const now = new Date().toISOString();
 
+  const current = existing.find((a) => a.id === id) || null;
+  if (!current) return null;
+
   const normalizedPatch = normalizeAppointmentPatch(patch);
+
+  const candidate = {
+    ...current,
+    ...normalizedPatch,
+    updatedAt: now,
+  };
+
+  assertNoConflict(existing, {
+    therapistId: candidate.therapistId,
+    start: candidate.start,
+    end: candidate.end,
+  }, id);
 
   const next = existing.map((a) => {
     if (a.id !== id) return a;
