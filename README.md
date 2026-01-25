@@ -1,150 +1,80 @@
-# MedicalCare - Client Side Treatment Management System
+# MedicalCare — Clinic Management (React + Vite)
 
-MedicalCare is a modern React based client side application designed to support clinicians in managing patients, treatment sessions, transcription, clinical documentation and future care planning.
+MedicalCare is a React (Vite) client application for managing patients and treatment workflow, including an appointments calendar, in-app notifications, and optional Medplum synchronization.
 
-The system is part of a larger professional project workflow, managed through Trello and Git branching strategy.  
-This README describes the MVP, core features and development flow without tying the project to specific filenames, so the structure can evolve freely during development.
+> Repository note: the `main-clean` branch may be protected and require Pull Requests for changes (no direct push).
 
 ---
 
-## 🎯 MVP Scope (Based on Trello)
+## ✅ Implemented Features
 
-The MVP focuses on the essential clinical workflow:  
-patient creation, documentation, transcription and report attachments.
-
-### 1. Digital Patient Record (Core)
-
+### Patient Management
 - Create and manage patient profiles.
-- Validate required fields (ID number, phone, date of birth).
-- Block invalid or duplicate ID numbers.
-- Store patient data locally so the records persist after refresh.
-- Maintain structured patient information:
-  - Demographics and contact details
-  - Notes
-  - Treatment history
-  - Attached reports
+- Persist patient data in browser storage so it survives refresh.
+- Patient details page with history and supporting UI modules.
 
-This is the foundation of the entire system.
+### Appointments Calendar (Treatments)
+- Weekly/day/month views using FullCalendar.
+- Create appointments via selection or “+ Add”.
+- Edit appointments in a drawer.
+- Drag & drop / resize appointments.
+- Clinic-hours enforcement (07:00–22:00).
+- Conflict prevention:
+  - Prevent double-booking for the same therapist.
+  - Prevent a patient being booked with two therapists at the same time.
+  - Warn on same-day appointments with another therapist (confirmation prompt).
 
----
+### Roles / Visibility
+- **Admin**: sees all appointments and can run sync.
+- **Therapist**: sees only their own appointments.
 
-### 2. Treatment Transcription - Audio Recording
+### In-App Notifications
+- Bell icon popover with a badge counter.
+- Notifications are persisted per user scope (admin / therapist).
+- Notifications are generated for appointment changes:
+  - Created / assigned to therapist
+  - Cancelled / removed
+  - Time changed (with suppression to avoid self-change noise)
+- Clear / dismiss notifications and persist dismissed IDs.
 
-- Record audio using the browser's microphone.
-- Show recording controls (start, stop, reset).
-- Provide basic or mock transcription.
-- Allow the clinician to add transcriptions to the patient’s treatment history.
-- Prepare groundwork for advanced speech-to-text API integration.
-
----
-
-### 3. Attach Clinical Reports
-
-- Upload and attach documents to a selected patient (PDF, images or other files).
-- Store metadata for each attached report.
-- Display attached documents inside the patient record.
-- Enable clinicians to quickly review previous materials.
-
----
-
-### 4. Treatment History View
-
-- Display chronological treatment sessions for each patient.
-- Include:
-  - Transcriptions
-  - Notes
-  - Attached reports
-- Prepare the UI for future advanced modules (care plan, treatment calendar).
+### Medplum Sync (Appointments)
+- Admin-only sync button.
+- If Medplum is not connected, user receives a clear message and sync does not run.
+- Sync creates/updates Appointment resources in Medplum and stores returned remote IDs.
+- Pending sync and sync errors are tracked per appointment.
 
 ---
 
-## 🔮 Next Planned Features (After MVP)
+## 🧰 Tech Stack
 
-These features are defined in Trello and will be implemented in separate feature branches after the MVP is complete.
-
-### Care Plan Builder
-
-- Create therapy goals per patient.
-- Add structured exercises, steps and instructions.
-- Define frequency and expected progress.
-- Integrate the plan into the patient’s history.
-
-### Treatment Calendar
-
-- Schedule upcoming treatments.
-- Choose dates and times from a calendar UI.
-- Store future appointments locally.
-- Allow clinicians to track upcoming and past sessions.
-
-### PDF Treatment Summary
-
-- Combine:
-  - Patient details
-  - Selected treatment history entries
-  - Care plan items
-- Generate a professional PDF treatment report.
-- Allow download, email or attaching the PDF to the patient record.
+- React + React Router
+- Vite
+- FullCalendar (timeGrid/dayGrid/interaction)
+- Medplum SDK
+- CSS (per page/component)
+- Browser storage for persistence
+- Testing: Vitest + Testing Library
 
 ---
 
-## 🛠️ Technology
+## 💾 Data & Persistence
 
-- React (Vite)
-- JavaScript (ES6+)
-- CSS (per component styling)
-- LocalStorage (persistent client side data)
-- Web Audio API (microphone recording)
-- Planned:
-  - jsPDF for PDF export
-  - Calendar UI library for scheduling
-  - Optional integrations with external clinical APIs in the future
+- App data is stored client-side.
+- Appointments and notifications persist across refresh.
+- Notifications are scoped per user key (admin or therapist).
 
 ---
 
-## 📁 Project Structure Philosophy
-
-The project follows a simple and scalable structure:
-
-- **Components**: each feature is built as a separate reusable component.
-- **CSS per component**: clean visual separation.
-- **LocalStorage**: used as the local data layer.
-- **Trello**: tracks all user stories and development tasks.
-- **Feature branches**: isolate work without breaking main.
-
-No file names are included in this README to keep development flexible.
-
----
-
-## 🌐 Development Flow (Trello + Git)
-
-1. Choose a Trello user story (MVP or planned).
-2. Create or switch to the appropriate `feature/...` branch.
-3. Build or refine the component for that feature.
-4. Add validation, accessibility, logic and UI.
-5. Test the feature locally (including page refresh and localStorage behavior).
-6. Update Trello status (In Progress → Review → Done).
-7. Merge the feature back into `main` when stable.
-
-This keeps the project clean, structured and professional.
-
----
-
-## 💾 Data Persistence
-
-- All patient data is stored on the client only.
-- Records persist after refresh.
-- Storage is normalized so:
-  - `history` exists for every patient,
-  - `reports` exists for every patient.
-- No backend or server needed for the MVP.
-
----
-
-## 🚀 How to Run Locally
+## 🚀 Run Locally
 
 ```bash
-git clone <your-repo-url>
-cd MedicalCare
 npm install
 npm run dev
 
+🔀 Git Workflow
+
+main-clean is protected and accepts changes via Pull Requests only.
+
+Development is done on feature branches.
+
+Approved changes are merged into main-clean
