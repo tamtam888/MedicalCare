@@ -1,3 +1,4 @@
+// src/pages/CalendarTreatmentsPage.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FullCalendar from "@fullcalendar/react";
@@ -11,6 +12,16 @@ import AppointmentDrawer from "../appointments/AppointmentDrawer";
 import { getAllTherapists } from "../therapists/therapistsStore";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { medplum } from "../medplumClient";
+import {
+  computeAndStoreNotifications,
+  createUserKey,
+  dismissNotifications,
+  fetchNotificationsFromMedplum,
+  getDismissedIds,
+  getStoredNotifications,
+  pushNotificationsToMedplum,
+  subscribeNotifications,
+} from "../notifications/notificationsStore";
 import "./CalendarTreatmentsPage.css";
 
 const CLINIC_START_TIME = "07:00:00";
@@ -63,7 +74,6 @@ function isRangeWithinClinicHours(start, end) {
 function getPatientFullName(patient) {
   if (!patient) return "";
   if (patient.fullName) return String(patient.fullName).trim();
-
   const first = String(patient.firstName || "").trim();
   const last = String(patient.lastName || "").trim();
   return `${first} ${last}`.trim();
@@ -78,7 +88,6 @@ function getPatientId(patient, fallbackId) {
 function buildEventTitle(patient, appointment) {
   const name = getPatientFullName(patient);
   const id = getPatientId(patient, appointment?.patientId);
-
   if (name && id) return `${name} · ${id}`;
   if (name) return name;
   if (id) return `Patient · ${id}`;
@@ -112,7 +121,11 @@ function sameDay(a, b) {
   const d1 = new Date(a);
   const d2 = new Date(b);
   if (!Number.isFinite(d1.getTime()) || !Number.isFinite(d2.getTime())) return false;
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
 }
 
 function formatDMY(dateLike) {
@@ -139,12 +152,7 @@ function getTherapistNameById(map, id) {
   return map.get(key) || key;
 }
 
-function checkPatientSameDayAndOverlap({
-  allAppointments,
-  candidate,
-  ignoreId = null,
-  therapistNameById,
-}) {
+function checkPatientSameDayAndOverlap({ allAppointments, candidate, ignoreId = null, therapistNameById }) {
   const patientId = digitsOnly(candidate?.patientId);
   const therapistId = String(candidate?.therapistId || "").trim();
   if (!patientId || !therapistId) return { ok: true, warned: false };
@@ -174,8 +182,7 @@ function checkPatientSameDayAndOverlap({
   if (sameDayHit) {
     const dmy = formatDMY(candidate.start);
     const otherName = getTherapistNameById(therapistNameById, sameDayHit.therapistId);
-    const msg =
-      `Warning: this patient already has an appointment on ${dmy} with ${otherName}.\n\nDo you want to continue?`;
+    const msg = `Warning: this patient already has an appointment on ${dmy} with ${otherName}.\n\nDo you want to continue?`;
     const ok = window.confirm(msg);
     if (!ok) return { ok: false, warned: true, reason: "Cancelled by user." };
     return { ok: true, warned: true };
@@ -185,9 +192,7 @@ function checkPatientSameDayAndOverlap({
 }
 
 async function syncAppointmentToMedplum(appointment, therapistMap) {
-  if (!medplum.isAuthenticated()) {
-    throw new Error("Not connected to Medplum");
-  }
+  if (!medplum.isAuthenticated()) throw new Error("Not connected to Medplum");
 
   const therapistRemoteId = therapistMap.get(String(appointment.therapistId || "").trim());
 
@@ -210,17 +215,41 @@ async function syncAppointmentToMedplum(appointment, therapistMap) {
   };
 
   const remoteId = String(appointment.remoteId || "").trim();
-
   if (remoteId) {
-    const updated = await medplum.updateResource({
-      ...resource,
-      id: remoteId,
-    });
+    const updated = await medplum.updateResource({ ...resource, id: remoteId });
     return updated.id;
-  } else {
-    const created = await medplum.createResource(resource);
-    return created.id;
   }
+  const created = await medplum.createResource(resource);
+  return created.id;
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function isToday(dateLike) {
+  const d = new Date(dateLike);
+  if (!Number.isFinite(d.getTime())) return false;
+  return startOfDay(d).getTime() === startOfDay(new Date()).getTime();
+}
+
+function formatHM(dateLike) {
+  const d = new Date(dateLike);
+  if (!Number.isFinite(d.getTime())) return "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function normalizeStatus(value) {
+  const s = String(value || "").toLowerCase().trim();
+  if (s === "cancel" || s === "canceled" || s === "cancelled") return "cancelled";
+  if (s === "completed" || s === "complete" || s === "done") return "completed";
+  if (s === "scheduled" || s === "casual" || s === "booked") return "neutral";
+  if (!s) return "neutral";
+  return s;
 }
 
 export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }) {
@@ -232,6 +261,18 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
   const [syncing, setSyncing] = useState(false);
   const reloadRef = useRef(null);
 
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifWrapRef = useRef(null);
+
+  const userKey = useMemo(() => createUserKey({ isAdmin, therapistId }), [isAdmin, therapistId]);
+
+  const [dismissedNotifs, setDismissedNotifs] = useState(() => getDismissedIds(userKey));
+  const [notifTick, setNotifTick] = useState(0);
+  const [medplumNotifs, setMedplumNotifs] = useState([]);
+
+  const clickTimersRef = useRef(new Map());
+  const lastClickRef = useRef({ id: null, ts: 0 });
+
   const reloadTherapists = async () => {
     try {
       const list = await getAllTherapists();
@@ -242,6 +283,36 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
   };
 
   reloadRef.current = reloadTherapists;
+
+  useEffect(() => {
+    const onDocMouseDown = (e) => {
+      if (!notifOpen) return;
+      const wrap = notifWrapRef.current;
+      if (!wrap) return;
+      if (wrap.contains(e.target)) return;
+      setNotifOpen(false);
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setNotifOpen(false);
+    };
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [notifOpen]);
+
+  useEffect(() => {
+    setDismissedNotifs(getDismissedIds(userKey));
+  }, [userKey]);
+
+  useEffect(() => {
+    const unsub = subscribeNotifications(() => setNotifTick((t) => t + 1));
+    return unsub;
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -345,6 +416,43 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
     });
   }, [visibleAppointments, patientsById, currentTherapistId]);
 
+  const getLabel = useMemo(() => {
+    return (apptLike) => {
+      const pid = digitsOnly(apptLike?.patientId);
+      const patient = pid ? patientsById.get(pid) : null;
+      return buildEventTitle(patient, apptLike);
+    };
+  }, [patientsById]);
+
+  useEffect(() => {
+    if (!appointments) return;
+
+    computeAndStoreNotifications({
+      isAdmin,
+      therapistId: currentTherapistId,
+      userKey,
+      appointments,
+      getLabel,
+    });
+
+    setNotifTick((t) => t + 1);
+  }, [appointments, isAdmin, currentTherapistId, userKey, getLabel]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    if (!medplum.isAuthenticated()) return;
+
+    const rid =
+      String(medplumProfile?.practitioner?.id || medplumProfile?.profile?.id || medplumProfile?.id || "").trim() || "";
+
+    if (!rid) return;
+
+    (async () => {
+      const list = await fetchNotificationsFromMedplum({ medplum, recipientPractitionerId: rid, count: 50 });
+      setMedplumNotifs(Array.isArray(list) ? list : []);
+    })();
+  }, [isAdmin, medplumProfile, notifTick]);
+
   const openCreateDrawer = (values) => {
     reloadRef.current?.();
     setDrawerMode("create");
@@ -418,11 +526,6 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
       status: "scheduled",
       notes: "",
     });
-  };
-
-  const handleEventClick = (clickInfo) => {
-    const appointment = clickInfo.event.extendedProps?.appointment;
-    if (appointment) openEditDrawer(appointment);
   };
 
   const handleEventDrop = async (info) => {
@@ -599,7 +702,7 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
     try {
       setSyncing(true);
 
-      const pending = appointments.filter((a) => a.pendingSync === true);
+      const pending = (appointments || []).filter((a) => a && a.pendingSync === true);
 
       if (!pending.length) {
         alert("All appointments are already synced!");
@@ -629,11 +732,8 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
 
       await refresh();
 
-      if (errorCount === 0) {
-        alert(`Successfully synced ${successCount} appointments!`);
-      } else {
-        alert(`Synced ${successCount} appointments. ${errorCount} failed.`);
-      }
+      if (errorCount === 0) alert(`Successfully synced ${successCount} appointments!`);
+      else alert(`Synced ${successCount} appointments. ${errorCount} failed.`);
     } catch (err) {
       alert(`Sync failed: ${err?.message || "Unknown error"}`);
     } finally {
@@ -641,8 +741,189 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
     }
   };
 
-  const handleOpenNotifications = () => {
-    alert("Notifications will be added next (reminders & permissions).");
+  const storedNotifications = useMemo(() => {
+    void notifTick;
+    return getStoredNotifications(userKey);
+  }, [userKey, notifTick]);
+
+  const notifications = useMemo(() => {
+    const list = [];
+
+    if (isAdmin) {
+      const visible = Array.isArray(visibleAppointments) ? visibleAppointments : [];
+      const failed = visible.filter((a) => a && a.syncError);
+      const pending = visible.filter((a) => a && a.pendingSync === true);
+
+      if (failed.length) {
+        list.push({
+          id: "sync-errors",
+          type: "error",
+          title: "Sync issues",
+          message: `${failed.length} appointment(s) failed to sync.`,
+        });
+      }
+
+      if (pending.length) {
+        list.push({
+          id: "sync-pending",
+          type: "info",
+          title: "Pending sync",
+          message: `${pending.length} appointment(s) pending sync.`,
+        });
+      }
+
+      if (!failed.length && !pending.length) {
+        list.push({
+          id: "system-ok",
+          type: "success",
+          title: "System",
+          message: "No sync issues detected.",
+        });
+      }
+
+      return list.filter((n) => n && !dismissedNotifs.includes(n.id));
+    }
+
+    const today = (Array.isArray(visibleAppointments) ? visibleAppointments : []).filter(
+      (a) => a && a.start && isToday(a.start)
+    );
+    const count = today.length;
+
+    if (count > 0) {
+      const sorted = today.slice().sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      const first = sorted[0];
+      const firstTime = first?.start ? formatHM(first.start) : "";
+      list.push({
+        id: "daily-summary",
+        type: "info",
+        title: "Today",
+        message: firstTime
+          ? `You have ${count} appointment(s). First at ${firstTime}.`
+          : `You have ${count} appointment(s) today.`,
+      });
+    } else {
+      list.push({
+        id: "daily-empty",
+        type: "success",
+        title: "Today",
+        message: "No appointments today.",
+      });
+    }
+
+    const merged = [...medplumNotifs, ...storedNotifications, ...list];
+    return merged.filter((n) => n && !dismissedNotifs.includes(n.id));
+  }, [isAdmin, visibleAppointments, dismissedNotifs, storedNotifications, medplumNotifs]);
+
+  const notifCount = notifications.length;
+
+  const clearNotifications = async () => {
+    const ids = notifications.map((n) => n.id);
+    dismissNotifications(userKey, ids);
+    setDismissedNotifs(getDismissedIds(userKey));
+    setNotifOpen(false);
+
+    if (!isAdmin && medplum.isAuthenticated()) {
+      const rid =
+        String(medplumProfile?.practitioner?.id || medplumProfile?.profile?.id || medplumProfile?.id || "").trim() ||
+        "";
+      if (rid) {
+        const localOnly = storedNotifications.filter((n) => n && n.id && !String(n.id).startsWith("sync-"));
+        await pushNotificationsToMedplum({ medplum, notifications: localOnly, recipientPractitionerId: rid });
+      }
+    }
+  };
+
+  const toggleNotifications = () => setNotifOpen((p) => !p);
+
+  const eventDidMount = (arg) => {
+    const el = arg?.el;
+    const appointment = arg?.event?.extendedProps?.appointment;
+    if (!el || !appointment) return;
+
+    const eventId = String(arg.event.id);
+
+    const clearTimer = () => {
+      const t = clickTimersRef.current.get(eventId);
+      if (t) clearTimeout(t);
+      clickTimersRef.current.delete(eventId);
+    };
+
+    const onClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const now = Date.now();
+      const last = lastClickRef.current;
+      const isDouble = last.id === eventId && now - last.ts < 280;
+      lastClickRef.current = { id: eventId, ts: now };
+
+      clearTimer();
+      if (isDouble) return;
+
+      const timer = setTimeout(() => {
+        openEditDrawer(appointment);
+        clearTimer();
+      }, 240);
+
+      clickTimersRef.current.set(eventId, timer);
+    };
+
+    const onDblClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      clearTimer();
+
+      const patientIdLocal = String(appointment.patientId || "").replace(/\D/g, "").trim();
+      if (!patientIdLocal) {
+        alert("No patient ID found for this appointment.");
+        return;
+      }
+      navigate(`/patients/${patientIdLocal}`);
+    };
+
+    el.addEventListener("click", onClick);
+    el.addEventListener("dblclick", onDblClick);
+
+    const cleanupKey = `mc_cleanup_${eventId}`;
+    el[cleanupKey] = () => {
+      clearTimer();
+      el.removeEventListener("click", onClick);
+      el.removeEventListener("dblclick", onDblClick);
+    };
+  };
+
+  const eventWillUnmount = (arg) => {
+    const el = arg?.el;
+    const eventId = String(arg?.event?.id || "");
+    if (!el || !eventId) return;
+
+    const cleanupKey = `mc_cleanup_${eventId}`;
+    const fn = el[cleanupKey];
+    if (typeof fn === "function") fn();
+    try {
+      delete el[cleanupKey];
+    } catch {
+      // noop
+    }
+  };
+
+  const eventClassNames = (arg) => {
+    const appt = arg?.event?.extendedProps?.appointment || null;
+    const idx = arg?.event?.extendedProps?.therapistColorIndex;
+    const therapistClass = Number.isInteger(idx) ? `mc-event--t${idx}` : "";
+
+    const end = arg?.event?.end || arg?.event?.start;
+    const isPast = end ? end.getTime() < Date.now() : false;
+
+    const s = normalizeStatus(appt?.status);
+    const statusClass =
+      s === "cancelled" ? "mc-event--cancelled" : s === "completed" ? "mc-event--completed" : "mc-event--neutral";
+    const pendingClass = appt?.pendingSync ? "mc-event--pending" : "";
+
+    return ["mc-event", therapistClass, statusClass, pendingClass, isPast ? "mc-event--past" : "mc-event--active"].filter(
+      Boolean
+    );
   };
 
   return (
@@ -650,33 +931,68 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
       <div className="mc-calendar-header">
         <div className="mc-calendar-title-wrap">
           <h1 className="mc-calendar-title">Appointments</h1>
-          <p className="mc-calendar-subtitle">
-            {loading ? "Loading appointments..." : `${visibleAppointments.length} appointments`}
-          </p>
+          <p className="mc-calendar-subtitle">{loading ? "Loading appointments..." : `${visibleAppointments.length} appointments`}</p>
         </div>
 
         <div className="mc-calendar-actions">
-          <button
-            type="button"
-            className="mc-icon-button"
-            onClick={handleOpenNotifications}
-            aria-label="Notifications"
-            title="Notifications"
-          >
-            <Bell size={18} />
-          </button>
+          <div className="mc-notifications-wrap" ref={notifWrapRef}>
+            <button
+              type="button"
+              className="mc-icon-button mc-bell-button"
+              onClick={toggleNotifications}
+              aria-label="Notifications"
+              title="Notifications"
+            >
+              <Bell size={18} />
+              {notifCount > 0 ? <span className="mc-notification-badge">{notifCount}</span> : null}
+            </button>
 
-          {isAdmin && (
+            {notifOpen ? (
+              <div className="mc-notifications-popover" role="dialog" aria-modal="false">
+                <div className="mc-notifications-head">
+                  <div className="mc-notifications-title">Notifications</div>
+                  <button type="button" className="mc-notifications-clear" onClick={clearNotifications} disabled={notifCount === 0}>
+                    Clear
+                  </button>
+                </div>
+
+                <div className="mc-notifications-body">
+                  {notifications.length ? (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={[
+                          "mc-notification-item",
+                          n.type === "error"
+                            ? "mc-notification-error"
+                            : n.type === "success"
+                            ? "mc-notification-success"
+                            : "mc-notification-info",
+                        ].join(" ")}
+                      >
+                        <div className="mc-notification-item-title">{n.title}</div>
+                        <div className="mc-notification-item-msg">{n.message}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="mc-notifications-empty">No notifications</div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {isAdmin ? (
             <button
               type="button"
               className="mc-icon-button"
               onClick={handleSyncAppointments}
-              disabled={syncing || !medplum.isAuthenticated()}
-              title="Sync to Medplum"
+              disabled={syncing}
+              title={medplum.isAuthenticated() ? "Sync to Medplum" : "Connect to Medplum first"}
             >
               <RefreshCw size={18} />
             </button>
-          )}
+          ) : null}
 
           <button type="button" className="mc-calendar-add" onClick={handleAddClick}>
             + Add
@@ -707,7 +1023,6 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
             selectMirror
             select={handleSelect}
             events={events}
-            eventClick={handleEventClick}
             editable
             eventDrop={handleEventDrop}
             eventResize={handleEventResize}
@@ -733,44 +1048,15 @@ export default function CalendarTreatmentsPage({ medplumProfile, patients = [] }
               api.changeView("timeGridWeek", date.date);
             }}
             dateClick={(info) => {
-              if (info.view.type === "dayGridMonth") {
-                info.view.calendar.changeView("timeGridDay", info.date);
-              }
+              if (info.view.type === "dayGridMonth") info.view.calendar.changeView("timeGridDay", info.date);
             }}
             dayCellDidMount={(arg) => {
               if (arg.view.type !== "dayGridMonth") return;
-              arg.el.addEventListener("dblclick", () => {
-                arg.view.calendar.changeView("timeGridDay", arg.date);
-              });
+              arg.el.addEventListener("dblclick", () => arg.view.calendar.changeView("timeGridDay", arg.date));
             }}
-            eventDidMount={(arg) => {
-              arg.el.style.cursor = "pointer";
-              arg.el.title = "Click to edit, Double-click to open patient file";
-
-              arg.el.addEventListener("dblclick", (e) => {
-                e.stopPropagation();
-
-                const appointment = arg.event.extendedProps?.appointment;
-                if (!appointment) return;
-
-                const patientId = String(appointment.patientId || "").replace(/\D/g, "").trim();
-                if (!patientId) {
-                  alert("No patient ID found for this appointment.");
-                  return;
-                }
-
-                navigate(`/patients/${patientId}`);
-              });
-            }}
-            eventClassNames={(arg) => {
-              const end = arg.event.end || arg.event.start;
-              const isPast = end ? end.getTime() < Date.now() : false;
-
-              const idx = arg.event.extendedProps?.therapistColorIndex;
-              const therapistClass = Number.isInteger(idx) ? `mc-event--t${idx}` : "";
-
-              return ["mc-event", therapistClass, isPast ? "mc-event--past" : "mc-event--active"].filter(Boolean);
-            }}
+            eventDidMount={eventDidMount}
+            eventWillUnmount={eventWillUnmount}
+            eventClassNames={eventClassNames}
           />
         </div>
       </div>
