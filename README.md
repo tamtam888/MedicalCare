@@ -31,7 +31,7 @@ MedicalCare is a React (Vite) client application for managing patients and treat
 ### In-App Notifications
 - Bell icon popover with a badge counter.
 - Notifications are persisted per user scope (admin / therapist).
-- Notifications are generated for appointment changes (depending on the implemented rules):
+- Notifications are generated for appointment changes:
   - Created / assigned to therapist
   - Cancelled / removed
   - Time changed (with suppression to avoid self-change noise)
@@ -52,15 +52,15 @@ MedicalCare is a React (Vite) client application for managing patients and treat
 - FullCalendar (timeGrid/dayGrid/interaction)
 - Medplum SDK
 - CSS (per page/component)
-- Browser storage for persistence (local storage / implemented stores)
-- Testing: Vitest + Testing Library (configured in the project)
+- Browser storage for persistence
+- Testing: Vitest + Testing Library
 
 ---
 
 ## 💾 Data & Persistence
 
 - App data is stored client-side.
-- Appointments and notifications persist across refresh based on the implemented stores.
+- Appointments and notifications persist across refresh.
 - Notifications are scoped per user key (admin or therapist).
 
 ---
@@ -70,15 +70,11 @@ MedicalCare is a React (Vite) client application for managing patients and treat
 ```bash
 npm install
 npm run dev
----
 
-## 🔀 Git Workflow
+🔀 Git Workflow
 
-- `main-clean` is protected and accepts changes via Pull Requests only.
-- Development is done on feature branches.
-- Approved changes are merged into `main-clean`.
+main-clean is protected and accepts changes via Pull Requests only.
 
-```
-bash
-npm install
-npm run dev
+Development is done on feature branches.
+
+Approved changes are merged into main-clean
