@@ -71,10 +71,9 @@ MedicalCare is a React (Vite) client application for managing patients and treat
 npm install
 npm run dev
 
-🔀 Git Workflow
+```
+## 🔀 Git Workflow
 
-main-clean is protected and accepts changes via Pull Requests only.
-
-Development is done on feature branches.
-
-Approved changes are merged into main-clean
+- `main-clean` is protected and accepts changes via Pull Requests only.
+- Development is done on feature branches.
+- Approved changes are merged into `main-clean`.
