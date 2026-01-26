@@ -1,17 +1,5 @@
-// src/components/Sidebar.jsx
 import { NavLink, useNavigate } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Stethoscope,
-  Pill,
-  ClipboardList,
-  CalendarDays,
-  BarChart2,
-  Shield,
-  Link2,
-  Users,
-  LogOut,
-} from "lucide-react";
+import { LayoutDashboard, Stethoscope, ClipboardList, CalendarDays, Users, LogOut } from "lucide-react";
 import { useAuthContext } from "../hooks/useAuthContext";
 import "./Sidebar.css";
 
@@ -68,20 +56,14 @@ function Sidebar() {
       </div>
 
       <nav className="sidebar-nav">
-        <NavLink
-          to="/dashboard"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-        >
+        <NavLink to="/dashboard" className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}>
           <span className="sidebar-link-icon">
             <LayoutDashboard size={18} />
           </span>
           <span className="sidebar-link-label">Dashboard</span>
         </NavLink>
 
-        <NavLink
-          to="/patients"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-        >
+        <NavLink to="/patients" className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}>
           <span className="sidebar-link-icon">
             <Stethoscope size={18} />
           </span>
@@ -89,10 +71,7 @@ function Sidebar() {
         </NavLink>
 
         {isAdmin ? (
-          <NavLink
-            to="/users"
-            className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-          >
+          <NavLink to="/users" className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}>
             <span className="sidebar-link-icon">
               <Users size={18} />
             </span>
@@ -101,16 +80,6 @@ function Sidebar() {
         ) : null}
 
         <div className="sidebar-section-title">Data</div>
-
-        <NavLink
-          to="/data/treatment"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-        >
-          <span className="sidebar-link-icon">
-            <Pill size={18} />
-          </span>
-          <span className="sidebar-link-label">Treatment data</span>
-        </NavLink>
 
         <NavLink
           to="/data/care-plan"
@@ -130,38 +99,6 @@ function Sidebar() {
             <CalendarDays size={18} />
           </span>
           <span className="sidebar-link-label">Appointments</span>
-        </NavLink>
-
-        <div className="sidebar-section-title">System</div>
-
-        <NavLink
-          to="/analytics"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-        >
-          <span className="sidebar-link-icon">
-            <BarChart2 size={18} />
-          </span>
-          <span className="sidebar-link-label">Analytics</span>
-        </NavLink>
-
-        <NavLink
-          to="/security"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-        >
-          <span className="sidebar-link-icon">
-            <Shield size={18} />
-          </span>
-          <span className="sidebar-link-label">Security</span>
-        </NavLink>
-
-        <NavLink
-          to="/api"
-          className={({ isActive }) => "sidebar-link" + (isActive ? " sidebar-link-active" : "")}
-        >
-          <span className="sidebar-link-icon">
-            <Link2 size={18} />
-          </span>
-          <span className="sidebar-link-label">API</span>
         </NavLink>
       </nav>
 

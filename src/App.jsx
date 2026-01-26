@@ -227,9 +227,7 @@ function App() {
             <Route
               path="/users"
               element={
-                <RequireAuth
-                  element={<UsersPage handleSyncAllTherapistsToMedplum={handleSyncAllTherapistsToMedplum} />}
-                />
+                <RequireAuth element={<UsersPage handleSyncAllTherapistsToMedplum={handleSyncAllTherapistsToMedplum} />} />
               }
             />
 
@@ -280,11 +278,6 @@ function App() {
             />
 
             <Route
-              path="/data/treatment"
-              element={<RequireAuth element={<SimplePage title="Treatment data" text="Analyze treatment records." />} />}
-            />
-
-            <Route
               path="/data/care-plan"
               element={
                 <RequireAuth
@@ -296,15 +289,10 @@ function App() {
             <Route
               path="/data/appointment"
               element={
-                <RequireAuth
-                  element={<CalendarTreatmentsPage medplumProfile={medplumProfile} patients={patientsState.patients} />}
-                />
+                <RequireAuth element={<CalendarTreatmentsPage medplumProfile={medplumProfile} patients={patientsState.patients} />} />
               }
             />
 
-            <Route path="/analytics" element={<RequireAuth element={<SimplePage title="Analytics" text="Dashboards and reports." />} />} />
-            <Route path="/security" element={<RequireAuth element={<SimplePage title="Security" text="Security and permissions." />} />} />
-            <Route path="/api" element={<RequireAuth element={<SimplePage title="API" text="API configuration." />} />} />
             <Route path="/settings" element={<RequireAuth element={<SimplePage title="Settings" text="Application settings." />} />} />
 
             <Route path="*" element={<Navigate to={loggedIn ? "/patients" : "/login"} replace />} />
